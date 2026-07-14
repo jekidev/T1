@@ -24,6 +24,29 @@ export class CommandSystem implements SimulationSystem {
       }
 
       const payload = command.command;
+
+      if (payload.type === "gather_blackmail_evidence" || payload.type === "execute_blackmail") {
+        const actor = context.world.get(command.actorFactionId)!;
+        actor.blackmail!.pendingActions.push({
+          commandId: command.id,
+          type: payload.type === "gather_blackmail_evidence" ? "gather" : "execute",
+          targetFactionId: payload.targetFactionId,
+          ...(payload.type === "execute_blackmail" ? { approach: payload.approach } : {}),
+        });
+        context.events.append({
+          tick: context.clock.tick,
+          tickDurationMs: context.clock.tickDurationMs,
+          type: "command.queued",
+          actorId: command.actorFactionId,
+          payload: {
+            commandId: command.id,
+            commandType: payload.type,
+            subsystem: "blackmail",
+          },
+        });
+        continue;
+      }
+
       if (payload.type === "move_units") {
         for (const entityId of payload.entityIds) {
           const entity = context.world.get(entityId)!;
