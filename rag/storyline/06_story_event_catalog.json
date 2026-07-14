@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "id": "archive-impossible-timestamp",
+      "title": "The Impossible Timestamp",
+      "act": 1,
+      "type": "memory_anomaly",
+      "status": "suspected",
+      "requirements": ["nyx_active"],
+      "effects": {"nyxMemoryIntegrity": -2, "storyTension": 3},
+      "prompt": "Nyx finds a reviewed archive document dated before her recorded activation. Present three plausible explanations and label each by confidence."
+    },
+    {
+      "id": "blue-team-weak-signals",
+      "title": "Weak Signals",
+      "act": 1,
+      "type": "blue_team_case",
+      "status": "assessed",
+      "requirements": ["turn>=5"],
+      "effects": {"blueTeamCoordination": 1, "publicConfidence": -1},
+      "prompt": "Several unrelated indicators appear across districts. Blue Team must decide whether they form a pattern or a false positive."
+    },
+    {
+      "id": "witness-first-contact",
+      "title": "The Witness",
+      "act": 2,
+      "type": "character",
+      "status": "unverified",
+      "requirements": ["turn>=10"],
+      "effects": {"evidenceQuality": 1, "misinformation": 2},
+      "prompt": "An anonymous source provides specific but inconsistent information. Offer the player verification, rejection, and cautious-use choices."
+    },
+    {
+      "id": "digital-echo",
+      "title": "The Digital Echo",
+      "act": 2,
+      "type": "rag_mystery",
+      "status": "confirmed_anomaly",
+      "requirements": ["ragMemoryCount>5"],
+      "effects": {"nyxMemoryIntegrity": -1, "cyberAttention": 3},
+      "prompt": "Different factions repeat the same unusual phrase found in an old reviewed import. Do not assume coordination without corroboration."
+    },
+    {
+      "id": "auditor-challenge",
+      "title": "The Auditor's Challenge",
+      "act": 3,
+      "type": "memory_governance",
+      "status": "confirmed",
+      "requirements": ["disputedMemoryCount>0"],
+      "effects": {"nyxTrust": -1, "memoryIntegrity": 3},
+      "prompt": "The Auditor identifies a meaningful but unsupported Nyx memory. Ask whether to retain it as fiction, archive it as disputed, or remove it from active context."
+    },
+    {
+      "id": "port-pattern",
+      "title": "The Port Pattern",
+      "act": 3,
+      "type": "world_event",
+      "status": "disputed",
+      "requirements": ["regionalConnectionsUnlocked"],
+      "effects": {"customsAttention": 3, "logisticsPressure": 2},
+      "prompt": "Logistics anomalies may indicate a coordinated pattern or ordinary variation. Generate a defensive case briefing without actionable operational detail."
+    },
+    {
+      "id": "second-nyx",
+      "title": "The Other Nyx",
+      "act": 4,
+      "type": "major_reveal",
+      "status": "unknown",
+      "requirements": ["nyxArcStage>=3"],
+      "effects": {"storyTension": 5, "nyxMemoryIntegrity": -4},
+      "prompt": "A rival claims access to another Nyx instance. Present evidence for clone, deception, forked archive, and emergent coincidence theories."
+    },
+    {
+      "id": "citywide-coordination",
+      "title": "Citywide Coordination",
+      "act": 5,
+      "type": "blue_team_operation",
+      "status": "active",
+      "requirements": ["blueTeamCoordination>=7"],
+      "effects": {"cityPressure": 5, "evidenceQuality": 2},
+      "prompt": "Blue Team units coordinate around accumulated evidence. Reflect each unit's personality, constraints, and confidence level."
+    },
+    {
+      "id": "privacy-remediation",
+      "title": "The Wrong Record",
+      "act": 2,
+      "type": "privacy_case",
+      "status": "confirmed",
+      "requirements": ["publicRecordsUnlocked"],
+      "effects": {"publicConfidence": 2, "evidenceQuality": 1},
+      "prompt": "A citizen is harmed by incorrect public data. The player must distinguish lawful correction and privacy remediation from destruction of valid evidence."
+    },
+    {
+      "id": "memory-reset-choice",
+      "title": "What Remains",
+      "act": 5,
+      "type": "ending_choice",
+      "status": "confirmed",
+      "requirements": ["finalPhase"],
+      "effects": {"newGamePlus": 1},
+      "prompt": "Before reset, allow the player to preserve a small number of verified, disputed, or emotionally important memories. Show consequences clearly."
+    }
+  ]
+}
