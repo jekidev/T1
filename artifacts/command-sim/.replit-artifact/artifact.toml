@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Nordlys Command"
+version = "1.0.0"
+id = "artifacts/command-sim"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18124
+
+[services.development]
+run = "pnpm --filter @workspace/command-sim run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/command-sim", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/command-sim/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18124"
+BASE_PATH = "/"

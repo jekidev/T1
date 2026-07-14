@@ -1,0 +1,392 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: scenarios
+    description: Scenario board persistence
+  - name: snapshots
+    description: Scenario version snapshots
+  - name: reference
+    description: Map templates and tutorial content
+  - name: advisor
+    description: AI strategic advisor
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /scenarios:
+    get:
+      operationId: listScenarios
+      tags: [scenarios]
+      summary: List saved scenarios
+      responses:
+        "200":
+          description: List of scenario summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScenarioSummary"
+    post:
+      operationId: createScenario
+      tags: [scenarios]
+      summary: Create a new scenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScenarioInput"
+      responses:
+        "201":
+          description: Created scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scenario"
+  /scenarios/{id}:
+    get:
+      operationId: getScenario
+      tags: [scenarios]
+      summary: Get a scenario by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scenario"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateScenario
+      tags: [scenarios]
+      summary: Update a scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScenarioUpdate"
+      responses:
+        "200":
+          description: Updated scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scenario"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteScenario
+      tags: [scenarios]
+      summary: Delete a scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+  /scenarios/{id}/snapshots:
+    get:
+      operationId: listSnapshots
+      tags: [snapshots]
+      summary: List snapshots for a scenario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of snapshot summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SnapshotSummary"
+    post:
+      operationId: createSnapshot
+      tags: [snapshots]
+      summary: Create a version snapshot of the current scenario state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SnapshotInput"
+      responses:
+        "201":
+          description: Created snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snapshot"
+        "404":
+          description: Not found
+  /scenarios/{id}/snapshots/{snapshotId}:
+    get:
+      operationId: getSnapshot
+      tags: [snapshots]
+      summary: Get a snapshot by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snapshot"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSnapshot
+      tags: [snapshots]
+      summary: Delete a snapshot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+  /map-templates:
+    get:
+      operationId: listMapTemplates
+      tags: [reference]
+      summary: List built-in real-world-inspired map templates
+      responses:
+        "200":
+          description: List of map templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MapTemplate"
+  /tutorial-scenario:
+    get:
+      operationId: getTutorialScenario
+      tags: [reference]
+      summary: Get the bundled tutorial scenario
+      responses:
+        "200":
+          description: Tutorial scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scenario"
+  /advisor/chat:
+    post:
+      operationId: sendAdvisorMessage
+      tags: [advisor]
+      summary: Ask the AI strategic advisor a question about the current board
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdvisorChatInput"
+      responses:
+        "200":
+          description: Advisor reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdvisorChatResponse"
+        "400":
+          description: Invalid request
+        "502":
+          description: Advisor unavailable
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ScenarioSummary:
+      type: object
+      required: [id, name, mapTemplateId, updatedAt, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        mapTemplateId: { type: string }
+        updatedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    Scenario:
+      type: object
+      required: [id, name, mapTemplateId, board, updatedAt, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        mapTemplateId: { type: string }
+        board:
+          type: object
+          additionalProperties: true
+          description: Full serialized board state (entities, zones, layers, phases, timeline, history)
+        updatedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    ScenarioInput:
+      type: object
+      required: [name, mapTemplateId, board]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        mapTemplateId: { type: string, minLength: 1 }
+        board:
+          type: object
+          additionalProperties: true
+    ScenarioUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        mapTemplateId: { type: string, minLength: 1 }
+        board:
+          type: object
+          additionalProperties: true
+    SnapshotSummary:
+      type: object
+      required: [id, scenarioId, label, createdAt]
+      properties:
+        id: { type: integer }
+        scenarioId: { type: integer }
+        label: { type: string }
+        createdAt: { type: string, format: date-time }
+    Snapshot:
+      type: object
+      required: [id, scenarioId, label, board, createdAt]
+      properties:
+        id: { type: integer }
+        scenarioId: { type: integer }
+        label: { type: string }
+        board:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+    SnapshotInput:
+      type: object
+      required: [label, board]
+      properties:
+        label: { type: string, minLength: 1 }
+        board:
+          type: object
+          additionalProperties: true
+    MapTemplate:
+      type: object
+      required: [id, name, description, width, height]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        width: { type: number }
+        height: { type: number }
+        features:
+          type: object
+          additionalProperties: true
+    AdvisorRole:
+      type: string
+      enum:
+        - neutral_analyst
+        - police_commander
+        - investigator
+        - legal_reviewer
+        - story_director
+        - red_team_risk_model
+    AdvisorChatInput:
+      type: object
+      required: [role, message, board]
+      properties:
+        role:
+          $ref: "#/components/schemas/AdvisorRole"
+        message: { type: string, minLength: 1 }
+        board:
+          type: object
+          additionalProperties: true
+          description: Current scenario board state (zones, entities, objectives, timeline, phase)
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdvisorHistoryMessage"
+    AdvisorHistoryMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content: { type: string }
+    AdvisorChatResponse:
+      type: object
+      required: [reply]
+      properties:
+        reply: { type: string }
+
