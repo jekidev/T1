@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import ScenarioList from '@/pages/scenario-list';
 import BoardPage from '@/pages/board';
+import AnalyticsPage from '@/pages/analytics';
 import { installTelemetry } from '@/lib/telemetry';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
@@ -15,6 +16,7 @@ function Router() {
     <Switch>
       <Route path="/" component={ScenarioList} />
       <Route path="/board/:id" component={BoardPage} />
+      <Route path="/analytics" component={AnalyticsPage} />
       <Route component={NotFound} />
     </Switch>
   );
