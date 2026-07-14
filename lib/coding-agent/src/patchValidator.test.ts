@@ -12,6 +12,7 @@ const task: AgentTask = {
   requestedBy: "user",
   allowedPaths: ["lib/strategy-sim/"],
   labels: [],
+  createPullRequest: true,
   limits: { maxIterations: 5, maxCommands: 20, maxFilesChanged: 5, maxPatchLines: 100, maxRuntimeMinutes: 10, maxModelTokens: 20000, maxCost: 5 },
 };
 
