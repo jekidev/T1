@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/StrategySimulation.test.ts src/ecs/world.test.ts src/blackmail/BlackmailSystem.test.ts src/visibility/StrategyVisibility.test.ts"
+    "test": "tsx --test src/StrategySimulation.test.ts src/assessment/TeamAssessment.test.ts src/ecs/world.test.ts src/blackmail/BlackmailSystem.test.ts src/npc/NpcMemory.test.ts src/npc/NpcRoutineEngine.test.ts src/status/CharacterStatus.test.ts src/visibility/StrategyVisibility.test.ts"
   },
   "dependencies": {
     "miniplex": "^2.0.0",
