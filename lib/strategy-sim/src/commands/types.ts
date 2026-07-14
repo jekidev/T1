@@ -30,6 +30,17 @@ const SetEconomyRatesCommandSchema = z.object({
   consumptionPerTick: z.record(z.number().finite().min(0).max(1_000_000)),
 });
 
+const GatherBlackmailEvidenceCommandSchema = z.object({
+  type: z.literal("gather_blackmail_evidence"),
+  targetFactionId: z.string().min(1).max(120),
+});
+
+const ExecuteBlackmailCommandSchema = z.object({
+  type: z.literal("execute_blackmail"),
+  targetFactionId: z.string().min(1).max(120),
+  approach: z.enum(["fear", "greed", "isolation"]),
+});
+
 const WaitCommandSchema = z.object({
   type: z.literal("wait"),
 });
@@ -39,6 +50,8 @@ export const StrategyCommandSchema = z.discriminatedUnion("type", [
   AttackTargetCommandSchema,
   ClaimTerritoryCommandSchema,
   SetEconomyRatesCommandSchema,
+  GatherBlackmailEvidenceCommandSchema,
+  ExecuteBlackmailCommandSchema,
   WaitCommandSchema,
 ]);
 
@@ -67,7 +80,10 @@ export interface CommandValidationFailure {
     | "unknown_entity"
     | "permission_denied"
     | "invalid_target"
-    | "insufficient_resources";
+    | "insufficient_resources"
+    | "insufficient_evidence"
+    | "cooldown_active"
+    | "feature_unavailable";
   reason: string;
 }
 
