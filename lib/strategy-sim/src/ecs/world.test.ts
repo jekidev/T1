@@ -19,6 +19,7 @@ void test("Miniplex world creates and queries strategy entities", () => {
 
   assert.equal(world.entitiesById.size, 101);
   assert.equal([...world.queries.factions].length, 1);
+  assert.equal([...world.queries.blackmailFactions].length, 1);
   assert.equal([...world.queries.units].length, 100);
   assert.equal([...world.queries.moving].length, 100);
   assert.equal(world.get("unit-050")?.faction?.factionId, "faction-a");
@@ -33,6 +34,7 @@ void test("system order is stable and documented", () => {
     "commands",
     "local-strategy",
     "tactical-intent",
+    "blackmail",
     "path-intent",
     "movement",
     "collision-avoidance",
