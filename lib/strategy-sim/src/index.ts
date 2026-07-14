@@ -12,3 +12,4 @@ export * from "./ecs/world";
 export * from "./events/EventLog";
 export * from "./scenarios/createHeadlessScenario";
 export * from "./systems/types";
+export * from "./visibility/StrategyVisibility";
