@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/policy.test.ts src/patchValidator.test.ts src/repositoryMap.test.ts src/runManager.test.ts"
+    "test": "tsx --test src/adapters.test.ts src/policy.test.ts src/patchValidator.test.ts src/repositoryMap.test.ts src/runManager.test.ts"
   },
   "dependencies": {
     "zod": "catalog:"
