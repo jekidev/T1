@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "servers": [
+    {"id":"memory","name":"Memory MCP","kind":"internal","transport":"internal","enabledByDefault":true,"readOnly":false,"capabilities":["memory.list","memory.create","memory.update","memory.delete"],"env":[]},
+    {"id":"filesystem","name":"Filesystem MCP","kind":"internal","transport":"internal","enabledByDefault":true,"readOnly":true,"capabilities":["filesystem.list","filesystem.read"],"env":["MCP_FILESYSTEM_ROOTS"]},
+    {"id":"github","name":"GitHub MCP","kind":"remote","transport":"http","url":"https://api.githubcopilot.com/mcp/","enabledByDefault":false,"readOnly":true,"capabilities":["repository.read","code.search","issues.read","pull_requests.read"],"env":["GITHUB_MCP_TOKEN"]},
+    {"id":"huggingface","name":"Hugging Face Hub MCP","kind":"remote","transport":"http","url":"https://huggingface.co/mcp","enabledByDefault":false,"readOnly":true,"capabilities":["hub.search","models.read","datasets.read","spaces.read"],"env":["HF_TOKEN"]},
+    {"id":"google-maps","name":"Google Maps MCP","kind":"adapter","transport":"http","enabledByDefault":false,"readOnly":true,"capabilities":["maps.geocode","maps.places","maps.routes","maps.distance_matrix"],"env":["GOOGLE_MAPS_API_KEY"]},
+    {"id":"playwright","name":"Playwright MCP","kind":"local","transport":"stdio","enabledByDefault":false,"readOnly":false,"command":"npx","args":["@playwright/mcp@latest"],"capabilities":["browser.navigate","browser.inspect","browser.screenshot","browser.interact"],"env":[]},
+    {"id":"telegram","name":"Telegram MCP","kind":"local","transport":"stdio","enabledByDefault":false,"readOnly":true,"command":"uv","args":["--directory","integrations/vendor/telegram-mcp","run","main.py"],"capabilities":["telegram.chats.read","telegram.messages.read","telegram.search"],"env":["TELEGRAM_API_ID","TELEGRAM_API_HASH","TELEGRAM_SESSION_STRING","TELEGRAM_EXPOSED_TOOLS"]},
+    {"id":"rsshub","name":"RSSHub","kind":"remote","transport":"http","enabledByDefault":false,"readOnly":true,"capabilities":["rss.fetch","rss.search"],"env":["RSSHUB_BASE_URL"]}
+  ]
+}
