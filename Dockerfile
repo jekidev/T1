@@ -1,0 +1,15 @@
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN BASE_PATH=/ pnpm build
+
+FROM node:22-bookworm-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=8080
+RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
+COPY --from=build /app /app
+EXPOSE 8080
+CMD ["pnpm", "start"]
