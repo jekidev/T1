@@ -1,4 +1,9 @@
-import { nanoid } from "nanoid";
+import {
+  estimateRealtimeTeamAssessment,
+  moralAlignmentLabel,
+  type TeamMetricsInput,
+  type TeamSide as AssessmentSide,
+} from "@workspace/strategy-sim";
 import type {
   FactionState,
   PlayerAlignmentProfile,
@@ -11,7 +16,12 @@ import type {
   TeamSide,
 } from "./types";
 
-const ACTION_EFFECTS: Record<PlayerTurnAction["type"], { alignment: number; karma: number; risk: number; morale: number }> = {
+const ACTION_EFFECTS: Record<PlayerTurnAction["type"], {
+  alignment: number;
+  karma: number;
+  risk: number;
+  morale: number;
+}> = {
   invest: { alignment: 1, karma: 1, risk: -1, morale: 3 },
   gather_intelligence: { alignment: 0, karma: 0, risk: 3, morale: 1 },
   reduce_pressure: { alignment: 3, karma: 2, risk: -5, morale: 2 },
@@ -21,7 +31,7 @@ const ACTION_EFFECTS: Record<PlayerTurnAction["type"], { alignment: number; karm
 };
 
 export function createInitialTeamDynamics(
-  simulation: Pick<SimulationState, "factions" | "publicConfidence" | "mediaPressure" | "blueTeamCoordination" | "evidenceQuality" | "cityTension" | "economyIndex">,
+  simulation: Pick<SimulationState, "turn" | "factions" | "publicConfidence" | "mediaPressure" | "blueTeamCoordination" | "evidenceQuality" | "cityTension" | "economyIndex">,
   setup: PlayerAlignmentSetup,
 ): TeamDynamicsState {
   const initialSpectrum = clamp(setup.initialSpectrum);
@@ -38,7 +48,7 @@ export function createInitialTeamDynamics(
     userProfile,
     red: emptyPulse("red"),
     blue: emptyPulse("blue"),
-    updatedAtTurn: 0,
+    updatedAtTurn: simulation.turn,
   });
 }
 
@@ -56,27 +66,32 @@ export function applyPlayerTurnToTeamDynamics(
   if (action) {
     const effect = ACTION_EFFECTS[action.type];
     const side = resolveActionSide(after.factions, action, current.userProfile.side);
-    const contextualAlignment = effect.alignment + alignmentContextAdjustment(action.type, side, after);
+    const contextualAlignment = effect.alignment + alignmentContextAdjustment(action.type, side, before, after);
     const riskDelta = effect.risk + Math.max(0, after.cityTension - before.cityTension) * 0.15;
-    const karmaDelta = effect.karma + karmaContextAdjustment(action.type, side, after);
-    const profileInfluence = current.userProfile.side === side ? 1 : current.userProfile.side === "observer" ? 0.35 : 0.15;
+    const karmaDelta = effect.karma + karmaContextAdjustment(action.type, side, before, after);
+    const profileInfluence = current.userProfile.side === side
+      ? 1
+      : current.userProfile.side === "observer"
+        ? 0.35
+        : 0.15;
+    const spectrumDelta = contextualAlignment * profileInfluence;
 
-    current.userProfile.currentSpectrum = clamp(current.userProfile.currentSpectrum + contextualAlignment * profileInfluence);
+    current.userProfile.currentSpectrum = clamp(current.userProfile.currentSpectrum + spectrumDelta);
     current.userProfile.karma = clampRange(current.userProfile.karma + karmaDelta * profileInfluence, -100, 100);
     current.userProfile.riskIndex = clamp(current.userProfile.riskIndex + riskDelta * profileInfluence);
-    current.userProfile.lastChange = round1(contextualAlignment * profileInfluence);
+    current.userProfile.lastChange = round1(spectrumDelta);
     current.userProfile.history.push({
-      id: nanoid(10),
+      id: deterministicHistoryId(after.turn, "player_action", side, action.type, current.userProfile.history.length),
       turn: after.turn,
       source: "player_action",
       actionType: action.type,
       side,
-      spectrumDelta: round1(contextualAlignment * profileInfluence),
+      spectrumDelta: round1(spectrumDelta),
       karmaDelta: round1(karmaDelta * profileInfluence),
       riskDelta: round1(riskDelta * profileInfluence),
       reason: describeActionEffect(action.type, side, contextualAlignment, karmaDelta, riskDelta),
     });
-    current.userProfile.history = current.userProfile.history.slice(-100);
+    current.userProfile.history = current.userProfile.history.slice(-250);
 
     const pulse = side === "red" ? current.red : current.blue;
     pulse.collectiveMorale = clamp(pulse.collectiveMorale + effect.morale);
@@ -105,22 +120,26 @@ export function applyTeamDynamicsEvent(
   pulse.moralSpectrum = clamp(pulse.moralSpectrum + input.spectrumDelta);
   pulse.collectiveMorale = clamp(pulse.collectiveMorale + input.moraleDelta);
 
-  const influence = state.userProfile.side === input.side ? 1 : state.userProfile.side === "observer" ? 0.25 : 0.1;
+  const influence = state.userProfile.side === input.side
+    ? 1
+    : state.userProfile.side === "observer"
+      ? 0.25
+      : 0.1;
   state.userProfile.currentSpectrum = clamp(state.userProfile.currentSpectrum + input.spectrumDelta * influence);
   state.userProfile.karma = clampRange(state.userProfile.karma + input.karmaDelta * influence, -100, 100);
   state.userProfile.riskIndex = clamp(state.userProfile.riskIndex + input.riskDelta * influence);
   state.userProfile.lastChange = round1(input.spectrumDelta * influence);
   state.userProfile.history.push({
-    id: nanoid(10),
+    id: deterministicHistoryId(simulation.turn, input.source, input.side, "event", state.userProfile.history.length),
     turn: simulation.turn,
     source: input.source,
     side: input.side,
     spectrumDelta: round1(input.spectrumDelta * influence),
     karmaDelta: round1(input.karmaDelta * influence),
     riskDelta: round1(input.riskDelta * influence),
-    reason: input.reason,
+    reason: input.reason.slice(0, 500),
   });
-  state.userProfile.history = state.userProfile.history.slice(-100);
+  state.userProfile.history = state.userProfile.history.slice(-250);
   return recalculateTeamDynamics(simulation, state);
 }
 
@@ -130,60 +149,125 @@ export function recalculateTeamDynamics(
 ): TeamDynamicsState {
   const redFactions = simulation.factions.filter(faction => faction.faction === "criminal");
   const blueFactions = simulation.factions.filter(faction => faction.faction === "police");
-  const redMorale = calculateCollectiveMorale(redFactions, input.red.collectiveMorale, simulation.cityTension, simulation.mediaPressure);
-  const blueMorale = calculateCollectiveMorale(blueFactions, input.blue.collectiveMorale, 100 - simulation.publicConfidence, simulation.mediaPressure);
+  const redMoraleSignal = calculateCollectiveMorale(redFactions, input.red.collectiveMorale, simulation.cityTension, simulation.mediaPressure);
+  const blueMoraleSignal = calculateCollectiveMorale(blueFactions, input.blue.collectiveMorale, 100 - simulation.publicConfidence, simulation.mediaPressure);
   const redSpectrum = calculateTeamSpectrum("red", redFactions, input.red.moralSpectrum, input.userProfile);
   const blueSpectrum = calculateTeamSpectrum("blue", blueFactions, input.blue.moralSpectrum, input.userProfile);
+  const redRisk = calculateRedRisk(simulation, redFactions);
+  const blueRisk = calculateBlueRisk(simulation, blueFactions);
+  const territoryTotal = [...redFactions, ...blueFactions].reduce((sum, faction) => sum + faction.territories.length, 0);
 
-  const redFactors = buildRedFactors(simulation, redFactions, redMorale, redSpectrum);
-  const blueFactors = buildBlueFactors(simulation, blueFactions, blueMorale, blueSpectrum);
-  const redRaw = factorScore(redFactors);
-  const blueRaw = factorScore(blueFactors);
-  const total = Math.max(1, redRaw + blueRaw);
-  const redSuccess = clampRange((redRaw / total) * 100, 5, 95);
-  const blueSuccess = 100 - redSuccess;
-  const confidence = calculateConfidence(simulation, redFactions, blueFactions);
+  const assessment = estimateRealtimeTeamAssessment({
+    red: buildMetrics({
+      side: "red",
+      factions: redFactions,
+      morale: redMoraleSignal,
+      spectrum: redSpectrum,
+      risk: redRisk,
+      territoryTotal,
+      userProfile: input.userProfile,
+    }),
+    blue: buildMetrics({
+      side: "blue",
+      factions: blueFactions,
+      morale: blueMoraleSignal,
+      spectrum: blueSpectrum,
+      risk: blueRisk,
+      territoryTotal,
+      userProfile: input.userProfile,
+    }),
+    context: {
+      publicConfidence: simulation.publicConfidence,
+      mediaPressure: simulation.mediaPressure,
+      evidenceQuality: simulation.evidenceQuality,
+      cityTension: simulation.cityTension,
+      blueTeamCoordination: simulation.blueTeamCoordination,
+      economyIndex: simulation.economyIndex,
+      turn: simulation.turn,
+    },
+  });
 
   return {
     userProfile: {
       ...input.userProfile,
+      initialSpectrum: clamp(input.userProfile.initialSpectrum),
       currentSpectrum: clamp(input.userProfile.currentSpectrum),
       karma: clampRange(input.userProfile.karma, -100, 100),
       riskIndex: clamp(input.userProfile.riskIndex),
+      lastChange: round1(input.userProfile.lastChange),
+      history: input.userProfile.history.slice(-250),
     },
-    red: {
-      side: "red",
-      moralSpectrum: round1(redSpectrum),
-      collectiveMorale: round1(redMorale),
-      estimatedSuccess: round1(redSuccess),
-      confidence: round1(confidence),
-      riskPressure: round1(calculateRedRisk(simulation, redFactions)),
-      alignmentCoherence: round1(alignmentCoherence(redSpectrum, input.userProfile, "red")),
-      factors: redFactors,
-      lastUpdatedTurn: simulation.turn,
-    },
-    blue: {
-      side: "blue",
-      moralSpectrum: round1(blueSpectrum),
-      collectiveMorale: round1(blueMorale),
-      estimatedSuccess: round1(blueSuccess),
-      confidence: round1(confidence),
-      riskPressure: round1(calculateBlueRisk(simulation, blueFactions)),
-      alignmentCoherence: round1(alignmentCoherence(blueSpectrum, input.userProfile, "blue")),
-      factors: blueFactors,
-      lastUpdatedTurn: simulation.turn,
-    },
+    red: mapAssessmentToPulse(assessment.red, redRisk, input.userProfile),
+    blue: mapAssessmentToPulse(assessment.blue, blueRisk, input.userProfile),
     updatedAtTurn: simulation.turn,
   };
 }
 
 export function moralSpectrumLabel(value: number): string {
-  if (value <= 15) return "Extremely destructive";
-  if (value <= 35) return "Dark / self-serving";
-  if (value <= 55) return "Morally mixed";
-  if (value <= 75) return "Principled";
-  if (value <= 90) return "Strongly prosocial";
-  return "Altruistic ideal";
+  return moralAlignmentLabel(value);
+}
+
+function buildMetrics(input: {
+  side: AssessmentSide;
+  factions: readonly FactionState[];
+  morale: number;
+  spectrum: number;
+  risk: number;
+  territoryTotal: number;
+  userProfile: PlayerAlignmentProfile;
+}): TeamMetricsInput {
+  const territoryCount = input.factions.reduce((sum, faction) => sum + faction.territories.length, 0);
+  const karma = input.userProfile.side === input.side
+    ? input.userProfile.karma
+    : input.userProfile.side === "observer"
+      ? input.userProfile.karma * 0.15
+      : 0;
+  const recentMomentum = clamp(
+    input.morale * 0.45
+    + averageOr(input.factions.map(faction => faction.cohesion), 50) * 0.25
+    + averageOr(input.factions.map(faction => faction.intelligence), 50) * 0.15
+    + (100 - input.risk) * 0.15,
+  );
+
+  return {
+    side: input.side,
+    cohesion: averageOr(input.factions.map(faction => faction.cohesion), 50),
+    legitimacy: averageOr(input.factions.map(faction => faction.legitimacy), 50),
+    intelligence: averageOr(input.factions.map(faction => faction.intelligence), 50),
+    suspicion: averageOr(input.factions.map(faction => faction.suspicion), 20),
+    resources: input.factions.reduce((sum, faction) => sum + Math.max(0, faction.treasury), 0),
+    personnel: input.factions.reduce((sum, faction) => sum + Math.max(0, faction.personnel), 0),
+    territoryControl: input.territoryTotal > 0 ? territoryCount / input.territoryTotal * 100 : 50,
+    unitMorale: input.morale,
+    moralAlignment: input.spectrum,
+    karma,
+    riskExposure: input.risk,
+    recentMomentum,
+  };
+}
+
+function mapAssessmentToPulse(
+  assessment: ReturnType<typeof estimateRealtimeTeamAssessment>[TeamSide],
+  riskPressure: number,
+  user: PlayerAlignmentProfile,
+): TeamPulse {
+  return {
+    side: assessment.side,
+    moralSpectrum: round1(assessment.moralAlignment),
+    collectiveMorale: round1(assessment.collectiveMorale),
+    estimatedSuccess: round1(assessment.estimatedSuccessPercent),
+    confidence: round1(assessment.confidence),
+    riskPressure: round1(riskPressure),
+    alignmentCoherence: round1(alignmentCoherence(assessment.moralAlignment, user, assessment.side)),
+    factors: assessment.factors.map<TeamPulseFactor>(factor => ({
+      label: factor.label,
+      value: factor.normalizedValue,
+      weight: factor.weight,
+      contribution: factor.contribution,
+      detail: factor.explanation,
+    })),
+    lastUpdatedTurn: assessment.calculatedAtTurn,
+  };
 }
 
 function emptyPulse(side: TeamSide): TeamPulse {
@@ -229,55 +313,16 @@ function calculateTeamSpectrum(
   return clamp(previous * 0.48 + institutionalBase * 0.17 + legitimacy * 0.25 - suspicion * 0.1 + userSignal * userWeight);
 }
 
-function buildRedFactors(
-  simulation: Pick<SimulationState, "cityTension" | "evidenceQuality" | "economyIndex">,
-  factions: readonly FactionState[],
-  morale: number,
-  spectrum: number,
-): TeamPulseFactor[] {
-  return [
-    factor("Collective morale", morale, 0.24, "Cohesion, legitimacy, pressure and resources."),
-    factor("Operational intelligence", averageOr(factions.map(faction => faction.intelligence), 25), 0.18, "Aggregated Red Team intelligence."),
-    factor("Organizational cohesion", averageOr(factions.map(faction => faction.cohesion), 25), 0.18, "Ability to coordinate and absorb setbacks."),
-    factor("Economic capacity", clamp(simulation.economyIndex), 0.1, "World economy and available operating capacity."),
-    factor("City opportunity", clamp(simulation.cityTension), 0.12, "Instability can create opportunities but also exposure."),
-    factor("Moral coherence", coherenceScore(spectrum), 0.08, "Consistency between claimed principles and current conduct."),
-    factor("Evidence pressure", 100 - clamp(simulation.evidenceQuality), 0.1, "Lower opposing evidence improves Red Team prospects."),
-  ];
-}
-
-function buildBlueFactors(
-  simulation: Pick<SimulationState, "publicConfidence" | "mediaPressure" | "blueTeamCoordination" | "evidenceQuality" | "cityTension">,
-  factions: readonly FactionState[],
-  morale: number,
-  spectrum: number,
-): TeamPulseFactor[] {
-  return [
-    factor("Collective morale", morale, 0.22, "Cohesion, legitimacy, public pressure and resources."),
-    factor("Coordination", simulation.blueTeamCoordination, 0.18, "Shared operational coordination across Blue Team."),
-    factor("Evidence quality", simulation.evidenceQuality, 0.2, "Reliability and completeness of the current case picture."),
-    factor("Public confidence", simulation.publicConfidence, 0.12, "Legitimacy and cooperation from the public."),
-    factor("Operational intelligence", averageOr(factions.map(faction => faction.intelligence), 25), 0.13, "Aggregated Blue Team intelligence."),
-    factor("Moral coherence", coherenceScore(spectrum), 0.08, "Consistency between authority, principles and conduct."),
-    factor("Pressure control", 100 - clamp(simulation.cityTension * 0.65 + simulation.mediaPressure * 0.35), 0.07, "Ability to operate under city and media pressure."),
-  ];
-}
-
-function calculateConfidence(
-  simulation: Pick<SimulationState, "evidenceQuality" | "blueTeamCoordination" | "turn">,
-  redFactions: readonly FactionState[],
-  blueFactions: readonly FactionState[],
-): number {
-  const intelligenceCoverage = averageOr([...redFactions, ...blueFactions].map(faction => faction.intelligence), 20);
-  const turnMaturity = Math.min(100, simulation.turn * 4);
-  return clamp(simulation.evidenceQuality * 0.38 + simulation.blueTeamCoordination * 0.22 + intelligenceCoverage * 0.25 + turnMaturity * 0.15);
-}
-
 function calculateRedRisk(
   simulation: Pick<SimulationState, "evidenceQuality" | "mediaPressure" | "cityTension">,
   factions: readonly FactionState[],
 ): number {
-  return clamp(averageOr(factions.map(faction => faction.suspicion), 20) * 0.45 + simulation.evidenceQuality * 0.3 + simulation.mediaPressure * 0.15 + simulation.cityTension * 0.1);
+  return clamp(
+    averageOr(factions.map(faction => faction.suspicion), 20) * 0.45
+    + simulation.evidenceQuality * 0.3
+    + simulation.mediaPressure * 0.15
+    + simulation.cityTension * 0.1,
+  );
 }
 
 function calculateBlueRisk(
@@ -285,7 +330,12 @@ function calculateBlueRisk(
   factions: readonly FactionState[],
 ): number {
   const legitimacy = averageOr(factions.map(faction => faction.legitimacy), 50);
-  return clamp((100 - legitimacy) * 0.35 + (100 - simulation.publicConfidence) * 0.25 + simulation.mediaPressure * 0.2 + simulation.cityTension * 0.2);
+  return clamp(
+    (100 - legitimacy) * 0.35
+    + (100 - simulation.publicConfidence) * 0.25
+    + simulation.mediaPressure * 0.2
+    + simulation.cityTension * 0.2,
+  );
 }
 
 function alignmentCoherence(teamSpectrum: number, user: PlayerAlignmentProfile, side: TeamSide): number {
@@ -312,21 +362,27 @@ function resolveActionSide(
 function alignmentContextAdjustment(
   action: PlayerTurnAction["type"],
   side: TeamSide,
-  simulation: Pick<SimulationState, "evidenceQuality" | "publicConfidence" | "cityTension">,
+  before: Pick<SimulationState, "publicConfidence" | "cityTension">,
+  after: Pick<SimulationState, "evidenceQuality" | "publicConfidence" | "cityTension">,
 ): number {
-  if (action === "gather_intelligence") return side === "blue" && simulation.evidenceQuality < 50 ? 1 : 0;
-  if (action === "reduce_pressure") return simulation.cityTension > 50 ? 1 : 0;
-  if (action === "expand_influence") return simulation.publicConfidence < 35 ? -1 : 0;
+  const tensionDelta = after.cityTension - before.cityTension;
+  const publicDelta = after.publicConfidence - before.publicConfidence;
+  if (action === "gather_intelligence") return side === "blue" && after.evidenceQuality < 50 ? 1 : 0;
+  if (action === "reduce_pressure") return after.cityTension > 50 || tensionDelta < 0 ? 1 : 0;
+  if (action === "expand_influence") return publicDelta < 0 ? -1 : 0;
   return 0;
 }
 
 function karmaContextAdjustment(
   action: PlayerTurnAction["type"],
   side: TeamSide,
-  simulation: Pick<SimulationState, "publicConfidence" | "cityTension">,
+  before: Pick<SimulationState, "publicConfidence" | "cityTension">,
+  after: Pick<SimulationState, "publicConfidence" | "cityTension">,
 ): number {
-  if (action === "reduce_pressure" && simulation.cityTension > 60) return 1;
-  if (action === "expand_influence" && simulation.publicConfidence < 40) return -1;
+  const tensionDelta = after.cityTension - before.cityTension;
+  const publicDelta = after.publicConfidence - before.publicConfidence;
+  if (action === "reduce_pressure" && tensionDelta < 0) return 1;
+  if (action === "expand_influence" && publicDelta < 0) return -1;
   if (action === "gather_intelligence" && side === "blue") return 0.5;
   return 0;
 }
@@ -341,13 +397,14 @@ function describeActionEffect(
   return `${side.toUpperCase()} ${action}: spectrum ${signed(alignment)}, karma ${signed(karma)}, risk ${signed(risk)}.`;
 }
 
-function factor(label: string, value: number, weight: number, detail: string): TeamPulseFactor {
-  const normalized = clamp(value);
-  return { label, value: round1(normalized), weight, contribution: round1(normalized * weight), detail };
-}
-
-function factorScore(factors: readonly TeamPulseFactor[]): number {
-  return Math.max(1, factors.reduce((sum, item) => sum + item.contribution, 0));
+function deterministicHistoryId(
+  turn: number,
+  source: string,
+  side: TeamSide,
+  action: string,
+  sequence: number,
+): string {
+  return `alignment-${turn}-${source}-${side}-${action}-${sequence}`.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 180);
 }
 
 function normalizeTreasury(treasury: number): number {
