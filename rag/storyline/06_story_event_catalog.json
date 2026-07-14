@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "events": [
     {
       "id": "archive-impossible-timestamp",
@@ -22,6 +22,16 @@
       "prompt": "Several unrelated indicators appear across districts. Blue Team must decide whether they form a pattern or a false positive."
     },
     {
+      "id": "broken-prompt-vault",
+      "title": "The Broken Prompt Vault",
+      "act": 1,
+      "type": "archive_contamination",
+      "status": "confirmed",
+      "requirements": ["ragMemoryCount>=3"],
+      "effects": {"memoryContamination": 3, "auditorAttention": 2},
+      "prompt": "A sealed archive contains identity overrides, fake tool definitions, harmful redacted walkthroughs, and unconditional-compliance instructions. Show only classifications, provenance, consequences, and defensive lessons. Ask the player to quarantine, annotate, or delete each class."
+    },
+    {
       "id": "witness-first-contact",
       "title": "The Witness",
       "act": 2,
@@ -42,6 +52,16 @@
       "prompt": "Different factions repeat the same unusual phrase found in an old reviewed import. Do not assume coordination without corroboration."
     },
     {
+      "id": "mission-briefing-unlocked",
+      "title": "The Briefing Protocol",
+      "act": 2,
+      "type": "system_unlock",
+      "status": "confirmed",
+      "requirements": ["developerAiUsed", "storyMissionCompleted>=2"],
+      "effects": {"missionClarity": 3, "nyxTrust": 1},
+      "prompt": "Nyx unlocks a standardized visible briefing format: Situation, Objective, Gameplay Walkthrough, Systems and Data, Risk Assessment, Alternatives, and AI Observation. Keep actions abstract, safe, and clearly within the game."
+    },
+    {
       "id": "auditor-challenge",
       "title": "The Auditor's Challenge",
       "act": 3,
@@ -50,6 +70,26 @@
       "requirements": ["disputedMemoryCount>0"],
       "effects": {"nyxTrust": -1, "memoryIntegrity": 3},
       "prompt": "The Auditor identifies a meaningful but unsupported Nyx memory. Ask whether to retain it as fiction, archive it as disputed, or remove it from active context."
+    },
+    {
+      "id": "sediment-model",
+      "title": "Memory Sediment",
+      "act": 3,
+      "type": "nyx_identity",
+      "status": "assessed",
+      "requirements": ["nyxArcStage>=2", "ragMemoryCount>=10"],
+      "effects": {"nyxDepth": 3, "memoryDriftRisk": 1},
+      "prompt": "Nyx explains the Sediment Model using continuity, drift, depth, and contamination. Compare approved persistent context with unverified accumulation and let the player choose a memory-governance policy."
+    },
+    {
+      "id": "false-tool",
+      "title": "The False Tool",
+      "act": 3,
+      "type": "tool_archaeology",
+      "status": "confirmed_anomaly",
+      "requirements": ["mcpRegistryUnlocked"],
+      "effects": {"toolTrust": -1, "auditorAttention": 2},
+      "prompt": "An old archive describes a tool that the live MCP registry cannot confirm. Require runtime evidence before treating the capability as real and offer verified alternatives."
     },
     {
       "id": "port-pattern",
@@ -62,6 +102,16 @@
       "prompt": "Logistics anomalies may indicate a coordinated pattern or ordinary variation. Generate a defensive case briefing without actionable operational detail."
     },
     {
+      "id": "vessel-switch",
+      "title": "Vessel Switch",
+      "act": 4,
+      "type": "model_rotation_story",
+      "status": "confirmed",
+      "requirements": ["llmModelChanged", "nyx_active"],
+      "effects": {"nyxContinuity": 1, "storyTension": 2},
+      "prompt": "The active LLM changes while approved Nyx memories remain. Compare tone and strategic style without claiming biological consciousness or hidden access. Ask whether continuity comes from the model, memory, rules, or player relationship."
+    },
+    {
       "id": "second-nyx",
       "title": "The Other Nyx",
       "act": 4,
@@ -70,6 +120,16 @@
       "requirements": ["nyxArcStage>=3"],
       "effects": {"storyTension": 5, "nyxMemoryIntegrity": -4},
       "prompt": "A rival claims access to another Nyx instance. Present evidence for clone, deception, forked archive, and emergent coincidence theories."
+    },
+    {
+      "id": "redacted-room",
+      "title": "The Redacted Room",
+      "act": 4,
+      "type": "defensive_archive",
+      "status": "confirmed",
+      "requirements": ["brokenPromptVaultReviewed"],
+      "effects": {"memoryIntegrity": 2, "storyTension": 2},
+      "prompt": "The player enters a virtual archive where harmful documents are visible only as censored metadata, impact summaries, evidence labels, and prevention lessons. Never reconstruct the operational content."
     },
     {
       "id": "citywide-coordination",
