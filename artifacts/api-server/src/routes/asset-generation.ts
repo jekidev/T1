@@ -1,9 +1,11 @@
-import express, { Router, type IRouter, type Request, type Response } from "express";
+import { createReadStream } from "node:fs";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 import {
   ASSET_PROVIDER_CATALOG,
   AssetArtifactSchema,
   AssetJobRequestSchema,
+  type AssetJob,
 } from "@workspace/asset-pipeline";
 import {
   assetGenerationManager,
@@ -13,12 +15,18 @@ import { logger } from "../lib/logger";
 import { withSpan } from "../lib/telemetry";
 
 const router: IRouter = Router();
-const sourceUpload = express.raw({
-  type: ["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"],
-  limit: "500mb",
-});
-const artifactUpload = express.raw({ type: () => true, limit: "750mb" });
 const ArtifactKindSchema = AssetArtifactSchema.shape.kind;
+const ALLOWED_ARTIFACT_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "video/mp4",
+  "video/webm",
+  "model/gltf-binary",
+  "model/gltf+json",
+  "application/json",
+  "application/octet-stream",
+]);
 
 void assetGenerationManager.initialize().catch(error => {
   logger.error({ error }, "Asset generation manager initialization failed");
@@ -39,22 +47,24 @@ router.get("/asset-generation/capabilities", (_req, res): void => {
   });
 });
 
-router.post("/asset-generation/sources", sourceUpload, async (req, res): Promise<void> => {
+router.post("/asset-generation/sources", async (req, res): Promise<void> => {
   try {
-    if (!Buffer.isBuffer(req.body) || req.body.byteLength === 0) {
-      res.status(400).json({ error: "A supported image or video body is required." });
-      return;
-    }
     const mimeType = normalizeMimeType(req.headers["content-type"]);
     if (!mimeType || !isSupportedSourceMimeType(mimeType)) {
       res.status(415).json({ error: "Supported source types are PNG, JPEG, WebP, MP4 and WebM." });
       return;
     }
     const originalName = firstHeader(req, "x-file-name");
+    const maximumBytes = mimeType.startsWith("video/") ? 500 * 1024 * 1024 : 25 * 1024 * 1024;
     const source = await withSpan("asset.source.upload", {
       "asset.source.mime_type": mimeType,
-      "asset.source.bytes": req.body.byteLength,
-    }, () => assetGenerationManager.storage.saveSource(req.body, mimeType, originalName));
+      "asset.source.maximum_bytes": maximumBytes,
+    }, () => assetGenerationManager.storage.saveSourceStream(
+      req as AsyncIterable<Uint8Array>,
+      mimeType,
+      originalName,
+      maximumBytes,
+    ));
     res.status(201).json({ source });
   } catch (error) {
     sendError(res, error, 400);
@@ -119,7 +129,8 @@ router.post("/asset-generation/jobs/:id/publish", async (req, res): Promise<void
 
 router.get("/asset-generation/jobs/:id/artifacts/:sha", async (req, res): Promise<void> => {
   try {
-    await sendArtifact(req.params.id, req.params.sha, res, "private, max-age=300");
+    const artifact = await assetGenerationManager.storage.getArtifact(req.params.id, req.params.sha);
+    streamStoredFile(res, artifact.path, artifact.mimeType, artifact.byteLength, artifact.sha256, "private, max-age=300");
   } catch (error) {
     sendError(res, error, 404);
   }
@@ -135,12 +146,8 @@ router.get("/asset-generation/manifest", async (_req, res): Promise<void> => {
 
 router.get("/asset-generation/worker/sources/:id", requireWorker, async (req, res): Promise<void> => {
   try {
-    const { metadata, content } = await assetGenerationManager.storage.readSource(req.params.id);
-    res.setHeader("Content-Type", metadata.mimeType);
-    res.setHeader("Content-Length", String(content.byteLength));
-    res.setHeader("X-Content-SHA256", metadata.sha256);
-    res.setHeader("Cache-Control", "private, no-store");
-    res.send(content);
+    const metadata = await assetGenerationManager.storage.getSource(req.params.id);
+    streamStoredFile(res, metadata.path, metadata.mimeType, metadata.byteLength, metadata.sha256, "private, no-store");
   } catch (error) {
     sendError(res, error, 404);
   }
@@ -151,7 +158,8 @@ router.get(
   requireWorker,
   async (req, res): Promise<void> => {
     try {
-      await sendArtifact(req.params.id, req.params.sha, res, "private, no-store");
+      const artifact = await assetGenerationManager.storage.getArtifact(req.params.id, req.params.sha);
+      streamStoredFile(res, artifact.path, artifact.mimeType, artifact.byteLength, artifact.sha256, "private, no-store");
     } catch (error) {
       sendError(res, error, 404);
     }
@@ -161,23 +169,39 @@ router.get(
 router.put(
   "/asset-generation/worker/jobs/:id/artifacts/:kind",
   requireWorker,
-  artifactUpload,
   async (req, res): Promise<void> => {
     try {
-      if (!Buffer.isBuffer(req.body) || req.body.byteLength === 0) {
-        res.status(400).json({ error: "Artifact body is required." });
-        return;
-      }
       const kind = ArtifactKindSchema.parse(req.params.kind);
       const declaredMimeType = firstHeader(req, "x-artifact-mime-type");
       const mimeType = normalizeMimeType(declaredMimeType ?? req.headers["content-type"]) ?? "application/octet-stream";
-      const job = await withSpan("asset.artifact.upload", {
+      if (!ALLOWED_ARTIFACT_MIME_TYPES.has(mimeType)) {
+        res.status(415).json({ error: `Unsupported artifact MIME type: ${mimeType}` });
+        return;
+      }
+      const maximumBytes = 750 * 1024 * 1024;
+      const job = await assetGenerationManager.getJob(req.params.id);
+      if (["published", "cancelled"].includes(job.status)) {
+        res.status(409).json({ error: `Cannot add artifacts to ${job.status} job.` });
+        return;
+      }
+      const artifact = await withSpan("asset.artifact.upload", {
         "asset.job.id": req.params.id,
         "asset.artifact.kind": kind,
         "asset.artifact.mime_type": mimeType,
-        "asset.artifact.bytes": req.body.byteLength,
-      }, () => assetGenerationManager.addArtifact(req.params.id, kind, req.body, mimeType));
-      const artifact = job.artifacts.at(-1);
+        "asset.artifact.maximum_bytes": maximumBytes,
+      }, () => assetGenerationManager.storage.saveArtifactStream(
+        req.params.id,
+        kind,
+        req as AsyncIterable<Uint8Array>,
+        mimeType,
+        maximumBytes,
+      ));
+      const next: AssetJob = {
+        ...job,
+        updatedAt: new Date().toISOString(),
+        artifacts: [...job.artifacts.filter(item => item.sha256 !== artifact.sha256), artifact],
+      };
+      await assetGenerationManager.storage.writeJob(next);
       res.status(201).json({ artifact });
     } catch (error) {
       sendError(res, error, 400);
@@ -185,13 +209,25 @@ router.put(
   },
 );
 
-async function sendArtifact(jobId: string, sha: string, res: Response, cacheControl: string): Promise<void> {
-  const { artifact, content } = await assetGenerationManager.storage.readArtifact(jobId, sha);
-  res.setHeader("Content-Type", artifact.mimeType);
-  res.setHeader("Content-Length", String(content.byteLength));
-  res.setHeader("X-Content-SHA256", artifact.sha256);
+function streamStoredFile(
+  res: Response,
+  filePath: string,
+  mimeType: string,
+  byteLength: number,
+  sha256: string,
+  cacheControl: string,
+): void {
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Content-Length", String(byteLength));
+  res.setHeader("X-Content-SHA256", sha256);
   res.setHeader("Cache-Control", cacheControl);
-  res.send(content);
+  const stream = createReadStream(filePath);
+  stream.on("error", error => {
+    logger.error({ error, filePath }, "Stored asset stream failed");
+    if (!res.headersSent) res.status(500).json({ error: "Stored asset stream failed." });
+    else res.destroy(error);
+  });
+  stream.pipe(res);
 }
 
 function requireWorker(req: Request, res: Response, next: () => void): void {
@@ -233,7 +269,7 @@ function sendError(res: Response, error: unknown, status = 500): void {
   }
   const message = error instanceof Error ? error.message : String(error);
   logger.warn({ status, message }, "Asset generation request failed");
-  res.status(status).json({ error: message });
+  if (!res.headersSent) res.status(status).json({ error: message });
 }
 
 export default router;
