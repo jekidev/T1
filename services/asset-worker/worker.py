@@ -58,6 +58,24 @@ class CommandResult(BaseModel):
     stderr: str
 
 
+def worker_token() -> str:
+    value = os.getenv("ASSET_WORKER_TOKEN", "")
+    if len(value) < 24:
+        raise HTTPException(status_code=503, detail="ASSET_WORKER_TOKEN must contain at least 24 characters.")
+    return value
+
+
+async def require_worker_auth(authorization: str | None = Header(default=None)) -> None:
+    expected = worker_token()
+    supplied = ""
+    if authorization:
+        prefix, _, value = authorization.partition(" ")
+        if prefix.lower() == "bearer":
+            supplied = value.strip()
+    if not supplied or not hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=401, detail="Invalid worker credential.")
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     configured = sorted(
@@ -88,17 +106,6 @@ async def process(
     return await execute_pipeline_step(request, operation="process")
 
 
-async def require_worker_auth(authorization: str | None = Header(default=None)) -> None:
-    expected = worker_token()
-    supplied = ""
-    if authorization:
-        prefix, _, value = authorization.partition(" ")
-        if prefix.lower() == "bearer":
-            supplied = value.strip()
-    if not supplied or not hmac.compare_digest(supplied, expected):
-        raise HTTPException(status_code=401, detail="Invalid worker credential.")
-
-
 async def execute_pipeline_step(request: WorkerRequest, operation: str) -> WorkerResponse:
     job_id = safe_segment(str(request.job.get("id", "unknown-job")))
     provider = safe_segment(request.role if request.role == "blender" else request.generator or request.role)
@@ -113,29 +120,16 @@ async def execute_pipeline_step(request: WorkerRequest, operation: str) -> Worke
     input_dir.mkdir()
     output_dir.mkdir()
 
-    notes: list[str] = []
     try:
         source_path = await download_source(request.source, input_dir) if request.source else None
         artifact_paths = await download_artifacts(effective_inputs(request), input_dir)
         primary_input = source_path or (artifact_paths[0] if artifact_paths else None)
-
-        placeholders = build_placeholders(
-            request=request,
-            job_id=job_id,
-            provider=provider,
-            operation=operation,
-            source_path=primary_input,
-            input_dir=input_dir,
-            output_dir=output_dir,
+        argv = render_command(
+            command_template,
+            build_placeholders(request, job_id, provider, operation, primary_input, input_dir, output_dir),
         )
-        argv = render_command(command_template, placeholders)
-        result = await asyncio.to_thread(
-            run_command,
-            argv,
-            command_workdir(provider),
-            timeout_seconds,
-        )
-        notes.extend(command_notes(result))
+        result = await asyncio.to_thread(run_command, argv, command_workdir(provider), timeout_seconds)
+        notes = command_notes(result)
         if result.return_code != 0:
             raise HTTPException(
                 status_code=502,
@@ -150,17 +144,9 @@ async def execute_pipeline_step(request: WorkerRequest, operation: str) -> Worke
         metadata = read_metadata(output_dir / "metadata.json")
         uploaded = await upload_outputs(request, output_dir)
         if not uploaded:
-            raise HTTPException(
-                status_code=502,
-                detail="Provider completed but produced no recognized output artifacts.",
-            )
+            raise HTTPException(status_code=502, detail="Provider completed but produced no recognized output artifacts.")
         notes.append(f"Uploaded {len(uploaded)} artifact(s): {', '.join(uploaded)}")
-
-        return WorkerResponse(
-            generatorVersion=generator_version(provider),
-            metadata=metadata,
-            notes=notes,
-        )
+        return WorkerResponse(generatorVersion=generator_version(provider), metadata=metadata, notes=notes)
     finally:
         if os.getenv("ASSET_KEEP_WORKDIR", "false").lower() not in {"1", "true", "yes"}:
             shutil.rmtree(job_root, ignore_errors=True)
@@ -169,7 +155,6 @@ async def execute_pipeline_step(request: WorkerRequest, operation: str) -> Worke
 def effective_inputs(request: WorkerRequest) -> list[InputArtifact]:
     if request.inputs:
         return request.inputs
-
     artifacts = request.job.get("artifacts")
     if not isinstance(artifacts, list):
         return []
@@ -214,11 +199,11 @@ async def download_artifacts(inputs: list[InputArtifact], input_dir: Path) -> li
 
 
 async def download_file(url: str, destination: Path, expected_sha256: str | None) -> None:
-    timeout = httpx.Timeout(connect=30, read=600, write=60, pool=30)
     headers = {"Authorization": f"Bearer {worker_token()}"}
+    timeout = httpx.Timeout(connect=30, read=600, write=60, pool=30)
+    maximum_bytes = positive_int("ASSET_WORKER_MAX_DOWNLOAD_BYTES", 1_500_000_000, minimum=1_000_000)
     digest = hashlib.sha256()
     byte_count = 0
-    maximum_bytes = positive_int("ASSET_WORKER_MAX_DOWNLOAD_BYTES", 1_500_000_000, minimum=1_000_000)
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
         async with client.stream("GET", url, headers=headers) as response:
@@ -268,11 +253,10 @@ async def upload_outputs(request: WorkerRequest, output_dir: Path) -> list[str]:
 
 async def upload_artifact(request: WorkerRequest, path: Path, kind: str) -> None:
     upload_url = f"{str(request.artifactUploadBaseUrl).rstrip('/')}/{quote(kind, safe='')}"
-    mime_type = mime_for_path(path)
     headers = {
         request.artifactUploadHeader: worker_token(),
         "Content-Type": "application/octet-stream",
-        "X-Artifact-Mime-Type": mime_type,
+        "X-Artifact-Mime-Type": mime_for_path(path),
         "X-Artifact-SHA256": sha256_file(path),
     }
     timeout = httpx.Timeout(connect=30, read=600, write=600, pool=30)
@@ -327,14 +311,10 @@ def render_command(template: str, placeholders: dict[str, str]) -> list[str]:
         raise HTTPException(status_code=500, detail=f"Invalid administrator command template: {error}") from error
     if not tokens:
         raise HTTPException(status_code=503, detail="Provider command is not configured.")
-
-    rendered: list[str] = []
-    for token in tokens:
-        try:
-            rendered.append(token.format_map(placeholders))
-        except KeyError as error:
-            raise HTTPException(status_code=500, detail=f"Unknown command placeholder: {error.args[0]}") from error
-    return rendered
+    try:
+        return [token.format_map(placeholders) for token in tokens]
+    except KeyError as error:
+        raise HTTPException(status_code=500, detail=f"Unknown command placeholder: {error.args[0]}") from error
 
 
 def run_command(argv: list[str], cwd: Path, timeout_seconds: int) -> CommandResult:
@@ -356,7 +336,7 @@ def run_command(argv: list[str], cwd: Path, timeout_seconds: int) -> CommandResu
 
 
 def command_for(provider: str) -> str:
-    key = f"ASSET_COMMAND_{provider.upper().replace('-', '_').replace('.', '_')}"
+    key = provider_env_key("ASSET_COMMAND", provider)
     value = os.getenv(key, "").strip()
     if not value:
         raise HTTPException(status_code=503, detail=f"Administrator command {key} is not configured.")
@@ -364,7 +344,7 @@ def command_for(provider: str) -> str:
 
 
 def command_workdir(provider: str) -> Path:
-    key = f"ASSET_WORKDIR_{provider.upper().replace('-', '_').replace('.', '_')}"
+    key = provider_env_key("ASSET_WORKDIR", provider)
     directory = Path(os.getenv(key, ".")).resolve()
     if not directory.is_dir():
         raise HTTPException(status_code=503, detail=f"Configured work directory does not exist: {directory}")
@@ -372,8 +352,11 @@ def command_workdir(provider: str) -> Path:
 
 
 def generator_version(provider: str) -> str:
-    key = f"ASSET_GENERATOR_VERSION_{provider.upper().replace('-', '_').replace('.', '_')}"
-    return os.getenv(key, "unknown").strip()[:80] or "unknown"
+    return os.getenv(provider_env_key("ASSET_GENERATOR_VERSION", provider), "unknown").strip()[:80] or "unknown"
+
+
+def provider_env_key(prefix: str, provider: str) -> str:
+    return f"{prefix}_{provider.upper().replace('-', '_').replace('.', '_')}"
 
 
 def read_metadata(path: Path) -> dict[str, Any]:
@@ -385,14 +368,7 @@ def read_metadata(path: Path) -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"Invalid metadata.json: {error}") from error
     if not isinstance(value, dict):
         raise HTTPException(status_code=502, detail="metadata.json must contain an object.")
-    allowed = {
-        "id",
-        "polygonCount",
-        "textureMemoryBytes",
-        "lodCount",
-        "skeletonId",
-        "promptHash",
-    }
+    allowed = {"id", "polygonCount", "textureMemoryBytes", "lodCount", "skeletonId", "promptHash"}
     return {key: value[key] for key in allowed if key in value}
 
 
@@ -409,11 +385,7 @@ def safe_subprocess_environment() -> dict[str, str]:
         "MKL_",
         "BLENDER_",
     )
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key.startswith(allowed_prefixes)
-    }
+    environment = {key: value for key, value in os.environ.items() if key.startswith(allowed_prefixes)}
     environment["PYTHONUNBUFFERED"] = "1"
     return environment
 
@@ -425,13 +397,6 @@ def command_notes(result: CommandResult) -> list[str]:
     if result.stderr.strip():
         notes.append(f"stderr: {redact(result.stderr.strip())[-2_000:]}")
     return notes
-
-
-def worker_token() -> str:
-    value = os.getenv("ASSET_WORKER_TOKEN", "")
-    if len(value) < 24:
-        raise HTTPException(status_code=503, detail="ASSET_WORKER_TOKEN must contain at least 24 characters.")
-    return value
 
 
 def sha256_file(path: Path) -> str:
