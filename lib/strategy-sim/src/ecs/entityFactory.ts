@@ -43,9 +43,9 @@ export function createFactionEntity(input: {
       consumptionPerTick: { credits: 0, supplies: 0, ...input.consumptionPerTick },
       relations: {},
     },
-    ai: input.aiPolicyId
-      ? { policyId: input.aiPolicyId, enabled: true }
-      : undefined,
+    ...(input.aiPolicyId
+      ? { ai: { policyId: input.aiPolicyId, enabled: true } }
+      : {}),
   };
 }
 
@@ -115,7 +115,7 @@ export function createTerritoryEntity(input: {
     territory: {
       name: input.name,
       radius: input.radius ?? 8,
-      ownerFactionId: input.ownerFactionId,
+      ...(input.ownerFactionId ? { ownerFactionId: input.ownerFactionId } : {}),
       captureProgress: {},
       captureRequired: input.captureRequired ?? 100,
     },
@@ -142,7 +142,7 @@ export function createResourceNodeEntity(input: {
       resourceType: input.resourceType,
       amount: input.amount,
       extractionPerTick: input.extractionPerTick,
-      ownerFactionId: input.ownerFactionId,
+      ...(input.ownerFactionId ? { ownerFactionId: input.ownerFactionId } : {}),
     },
   };
 }
