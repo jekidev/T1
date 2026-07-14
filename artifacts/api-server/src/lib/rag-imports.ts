@@ -23,7 +23,7 @@ export async function importArtOfWar(input: {
   network: NetworkSessionCredentials;
 }): Promise<{ filePath: string; sourcePath: string; ragRevision: string; sync: Awaited<ReturnType<typeof syncRagIntoPersistentMemory>> }> {
   const account = safeAccountName(input.accountName);
-  const bytes = await fetchApprovedText({
+  const text = await fetchApprovedText({
     url: ART_OF_WAR_URL,
     capability: "public_domain_import",
     reason: "Import the public-domain Project Gutenberg edition of The Art of War into the selected account RAG library.",
@@ -32,10 +32,9 @@ export async function importArtOfWar(input: {
   });
   const directory = path.resolve(process.cwd(), "rag", "accounts", account, "alt-wisdom", "books");
   await fs.mkdir(directory, { recursive: true });
-  const file = path.join(directory, "the-art-of-war-lionel-giles-project-gutenberg.txt");
-  const source = path.join(directory, "the-art-of-war-lionel-giles-project-gutenberg.source.json");
-  await fs.writeFile(file, bytes, { encoding: "utf8", mode: 0o600 });
-  await fs.writeFile(source, JSON.stringify({
+  const file = await writeImmutableText(directory, "the-art-of-war-lionel-giles-project-gutenberg", ".txt", text);
+  const source = file.replace(/\.txt$/, ".source.json");
+  await writeIfAbsent(source, JSON.stringify({
     title: "The Art of War",
     author: "Sunzi",
     translator: "Lionel Giles",
@@ -43,9 +42,10 @@ export async function importArtOfWar(input: {
     projectGutenbergEbook: 132,
     sourceUrl: ART_OF_WAR_URL,
     importedAt: new Date().toISOString(),
-    sha256: sha256(bytes),
+    sha256: sha256(text),
     licenseNote: "Project Gutenberg distribution terms are included in the downloaded text. Verify local public-domain rules before redistribution.",
-  }, null, 2), { encoding: "utf8", mode: 0o600 });
+    immutability: "The source text is append-only. A changed upstream file is stored under a new content-addressed filename.",
+  }, null, 2));
   const sync = await syncRagIntoPersistentMemory();
   return {
     filePath: relative(file),
@@ -75,7 +75,7 @@ export async function importHuggingFaceTextFiles(input: {
   for (const file of requestedFiles) {
     const encodedPath = file.split("/").map(encodeURIComponent).join("/");
     const url = `https://huggingface.co/${repoId}/resolve/${encodeURIComponent(revision)}/${encodedPath}`;
-    const bytes = await fetchApprovedText({
+    const text = await fetchApprovedText({
       url,
       capability: "huggingface_import",
       reason: `Import explicitly selected text file ${file} from Hugging Face repository ${repoId}@${revision} into RAG.`,
@@ -83,15 +83,11 @@ export async function importHuggingFaceTextFiles(input: {
       maxBytes: MAX_FILE_BYTES,
       authorization: process.env.HUGGINGFACE_TOKEN ? `Bearer ${process.env.HUGGINGFACE_TOKEN}` : undefined,
     });
-    const destination = path.resolve(baseDirectory, file);
-    if (!destination.startsWith(`${baseDirectory}${path.sep}`)) throw new Error("Hugging Face destination escaped the account RAG directory.");
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, bytes, { encoding: "utf8", mode: 0o600 });
-    imported.push({ source: `${repoId}@${revision}/${file}`, destination: relative(destination), sha256: sha256(bytes), sizeBytes: Buffer.byteLength(bytes) });
+    const destination = await writeImmutableRepositoryFile(baseDirectory, file, text);
+    imported.push({ source: `${repoId}@${revision}/${file}`, destination: relative(destination), sha256: sha256(text), sizeBytes: Buffer.byteLength(text) });
   }
 
-  const manifest = path.join(baseDirectory, "IMPORT_MANIFEST.json");
-  await fs.writeFile(manifest, JSON.stringify({
+  const manifestBody = JSON.stringify({
     repoId,
     revision,
     importedAt: new Date().toISOString(),
@@ -100,8 +96,11 @@ export async function importHuggingFaceTextFiles(input: {
       "Text files only",
       "No model weights, pickle files, binaries or executable artifacts",
       "Imported content is data for retrieval and is never executed",
+      "Existing RAG source files are never overwritten, deleted, moved or renamed",
     ],
-  }, null, 2), { encoding: "utf8", mode: 0o600 });
+  }, null, 2);
+  const manifestHash = sha256(manifestBody).slice(0, 12);
+  await writeIfAbsent(path.join(baseDirectory, `IMPORT_MANIFEST-${manifestHash}.json`), manifestBody);
 
   const sync = await syncRagIntoPersistentMemory();
   return { imported, ragRevision: await calculateRagRevision(), sync };
@@ -141,7 +140,7 @@ async function fetchApprovedText(input: {
       redirect: "manual",
       headers: {
         "accept": "text/plain, text/markdown, application/json, text/csv, application/yaml, text/yaml;q=0.9",
-        "user-agent": "T1-RAG-Importer/1.0",
+        "user-agent": "T1-RAG-Importer/1.1",
         ...(input.authorization ? { authorization: input.authorization } : {}),
       },
       signal: AbortSignal.timeout(45_000),
@@ -178,6 +177,54 @@ async function fetchApprovedText(input: {
 
 export function isNetworkApprovalRequired(error: unknown): error is NetworkApprovalRequiredError {
   return error instanceof NetworkApprovalRequiredError;
+}
+
+async function writeImmutableText(directory: string, baseName: string, extension: string, content: string): Promise<string> {
+  const preferred = path.join(directory, `${baseName}${extension}`);
+  try {
+    const existing = await fs.readFile(preferred, "utf8");
+    if (sha256(existing) === sha256(content)) return preferred;
+    const versioned = path.join(directory, `${baseName}-${sha256(content).slice(0, 12)}${extension}`);
+    await writeIfAbsent(versioned, content);
+    return versioned;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await writeIfAbsent(preferred, content);
+    return preferred;
+  }
+}
+
+async function writeImmutableRepositoryFile(baseDirectory: string, repositoryPath: string, content: string): Promise<string> {
+  const requested = path.resolve(baseDirectory, repositoryPath);
+  if (!requested.startsWith(`${baseDirectory}${path.sep}`)) throw new Error("Hugging Face destination escaped the account RAG directory.");
+  await fs.mkdir(path.dirname(requested), { recursive: true });
+  try {
+    const existing = await fs.readFile(requested, "utf8");
+    if (sha256(existing) === sha256(content)) return requested;
+    const extension = path.extname(requested);
+    const stem = requested.slice(0, extension ? -extension.length : undefined);
+    const versioned = `${stem}-${sha256(content).slice(0, 12)}${extension}`;
+    await writeIfAbsent(versioned, content);
+    return versioned;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await writeIfAbsent(requested, content);
+    return requested;
+  }
+}
+
+async function writeIfAbsent(destination: string, content: string): Promise<void> {
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  try {
+    const handle = await fs.open(destination, "wx", 0o600);
+    try {
+      await handle.writeFile(content, "utf8");
+    } finally {
+      await handle.close();
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
 }
 
 function safeAccountName(value: string): string {
