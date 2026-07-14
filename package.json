@@ -20,8 +20,9 @@
     "local:run": "NODE_ENV=production pnpm build && pnpm start",
     "test:strategy": "pnpm --filter @workspace/strategy-sim test",
     "test:assets": "pnpm --filter @workspace/asset-pipeline test",
+    "test:geo": "pnpm --filter @workspace/geo-world test",
     "test:command-sim": "pnpm --filter @workspace/command-sim test",
-    "test:integration": "pnpm test:strategy && pnpm test:assets && pnpm test:command-sim",
+    "test:integration": "pnpm test:strategy && pnpm test:assets && pnpm test:geo && pnpm test:command-sim",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
