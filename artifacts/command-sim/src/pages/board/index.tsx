@@ -1,7 +1,7 @@
 import { useLocation, useParams } from "wouter";
 import { useEffect, useState } from "react";
 import { useGetScenario, useGetTutorialScenario, useUpdateScenario, getGetScenarioQueryKey, getGetTutorialScenarioQueryKey } from "@workspace/api-client-react";
-import { useBoardStore, readAutosaveTimestamp, simulateTurn, type PlayerTurnAction } from "@/lib/game";
+import { applyTeamDynamicsEvent, useBoardStore, readAutosaveTimestamp, simulateTurn, type PlayerTurnAction, type TeamSide } from "@/lib/game";
 import { advanceBoardStrategy, runBoardBlackmailAction, type BoardBlackmailAction } from "@/lib/strategy/boardStrategyBridge";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { CommandCanvas } from "./canvas";
@@ -41,9 +41,9 @@ export default function BoardPage() {
   useEffect(() => {
     const data = isTutorial ? tutorialQuery.data : scenarioQuery.data;
     if (data && initializedId !== id) {
-      loadBoard(data.board as any, data.id, data.name, data.description || "");
-      const loadedBoard = data.board as any;
-      if (loadedBoard?.world) saveWorldConfig({ ...loadedBoard.world, supplierCountry: loadedBoard.world.country, workAreaLabel: `${loadedBoard.world.city} og omegn` });
+      loadBoard(data.board as never, data.id, data.name, data.description || "");
+      const loadedBoard = data.board as { world?: Record<string, unknown> };
+      if (loadedBoard?.world) saveWorldConfig({ ...loadedBoard.world, supplierCountry: loadedBoard.world.country, workAreaLabel: `${loadedBoard.world.city} og omegn` } as never);
       setInitializedId(id!);
       if (isTutorial || localStorage.getItem(`tutorial-pending-${data.id}`) === "1" || localStorage.getItem("operation-kobenhavn-tutorial-complete") !== "1") setTutorialOpen(true);
     }
@@ -60,16 +60,40 @@ export default function BoardPage() {
   };
   const resolveBlackmail = (action: BoardBlackmailAction) => {
     const result = runBoardBlackmailAction(board, action);
-    if (result.board !== board) {
-      loadBoard(result.board, scenarioId, scenarioName, scenarioDescription);
+    let resolvedBoard = result.board;
+    const simulation = resolvedBoard.simulation;
+    if (result.accepted && simulation) {
+      const actor = simulation.factions.find(faction => faction.id === action.actorFactionId);
+      const side: TeamSide = actor?.faction === "police" ? "blue" : "red";
+      const success = /succeeded|lykkedes/i.test(result.message);
+      const failed = /failed|mislykkedes/i.test(result.message);
+      const effect = action.type === "gather"
+        ? { spectrumDelta: -0.5, karmaDelta: -0.5, riskDelta: 2, moraleDelta: 0.5, reason: "Gathering leverage increased exposure and created a small ethical cost." }
+        : success
+          ? { spectrumDelta: -4, karmaDelta: -3, riskDelta: 5, moraleDelta: 2, reason: "A successful coercive action increased short-term morale while lowering moral alignment and increasing exposure." }
+          : failed
+            ? { spectrumDelta: -2, karmaDelta: -2, riskDelta: 8, moraleDelta: -4, reason: "A failed coercive action damaged collective morale and sharply increased risk." }
+            : { spectrumDelta: -2, karmaDelta: -2, riskDelta: 5, moraleDelta: -1, reason: "The coercive action carried moral and operational costs." };
+      resolvedBoard = {
+        ...resolvedBoard,
+        simulation: {
+          ...simulation,
+          teamDynamics: applyTeamDynamicsEvent(simulation, {
+            side,
+            source: "blackmail",
+            ...effect,
+          }),
+        },
+      };
     }
+    if (resolvedBoard !== board) loadBoard(resolvedBoard, scenarioId, scenarioName, scenarioDescription);
     toast({
       title: result.accepted ? "In-game blackmail resolved" : "Blackmail command rejected",
       description: result.message,
       ...(result.accepted ? {} : { variant: "destructive" as const }),
     });
   };
-  const handleSave = async () => { if (isTutorial || !scenarioId) { toast({ title: "Cannot save tutorial directly" }); return; } try { await updateMutation.mutateAsync({ id: scenarioId, data: { board: board as any } }); toast({ title: "Scenario saved" }); } catch { toast({ title: "Save failed", variant: "destructive" }); } };
+  const handleSave = async () => { if (isTutorial || !scenarioId) { toast({ title: "Cannot save tutorial directly" }); return; } try { await updateMutation.mutateAsync({ id: scenarioId, data: { board: board as never } }); toast({ title: "Scenario saved" }); } catch { toast({ title: "Save failed", variant: "destructive" }); } };
   const handleExport = () => { const blob = new Blob([JSON.stringify(board, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `operation-${scenarioName.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
 
   if ((!isTutorial && scenarioQuery.isLoading) || (isTutorial && tutorialQuery.isLoading)) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
