@@ -94,6 +94,7 @@ Command validation, event ordering, authoritative reducers, and save serializati
 The following must be deterministic for identical initial state, seed, commands, and tick count:
 
 - command ordering and rejection
+- evidence gathering and blackmail resolution
 - movement integration
 - combat resolution
 - economy and production
@@ -113,7 +114,7 @@ Wall-clock timestamps, random UUIDs, render FPS, network latency, and LLM text m
 2. Define small composable components and `StrategyEntity`.
 3. Create a Miniplex world and typed queries.
 4. Add deterministic IDs, seeded random service, fixed clock, command queue, validators, and event log.
-5. Implement movement, combat, economy, production, territory, morale, and cleanup systems.
+5. Implement movement, combat, economy, production, territory, in-game blackmail, morale, and cleanup systems.
 6. Add save/load snapshots and replay from commands.
 7. Add headless tests with two factions and 100 units.
 
@@ -123,7 +124,7 @@ Wall-clock timestamps, random UUIDs, render FPS, network latency, and LLM text m
 2. Create a `StrategySnapshot -> BoardState` presentation adapter.
 3. Add an opt-in strategy mode flag per scenario.
 4. Keep the current `simulateTurn()` path as fallback until parity tests pass.
-5. Add an inspection panel without making React authoritative.
+5. Add inspection and blackmail panels without making React authoritative.
 
 ### Phase B and later
 
@@ -139,14 +140,15 @@ Phase A uses this stable order:
 1. command execution
 2. local strategic policy
 3. tactical intent
-4. path intent extension point
-5. movement
-6. collision/avoidance extension point
-7. combat
-8. economy
-9. production and construction
-10. territory and visibility
-11. morale and cleanup
-12. event finalization and snapshot publication
+4. in-game blackmail resolution
+5. path intent extension point
+6. movement
+7. collision/avoidance extension point
+8. combat
+9. economy
+10. production and construction
+11. territory and visibility
+12. morale and cleanup
+13. event finalization and snapshot publication
 
 Extension points that are not implemented in Phase A remain disabled and do not mutate state.
