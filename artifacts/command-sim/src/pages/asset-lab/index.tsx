@@ -24,13 +24,14 @@ import {
   PauseCircle,
   Play,
   RefreshCw,
-  ShieldCheck,
   Upload,
   UserRound,
   XCircle,
 } from "lucide-react";
 
 type JobKind = AssetJobRequest["kind"];
+type UserLicenseStatus = Exclude<LicenseStatus, "verified">;
+type UserJobAction = "cancel" | "retry";
 
 interface CapabilityResponse {
   providers: Array<{
@@ -44,6 +45,7 @@ interface CapabilityResponse {
   blenderConfigured: boolean;
   publicBaseUrlConfigured: boolean;
   workerAuthenticationConfigured: boolean;
+  assetReviewConfigured: boolean;
 }
 
 export default function AssetLabPage() {
@@ -54,7 +56,7 @@ export default function AssetLabPage() {
   const [sourceName, setSourceName] = useState("");
   const [presetId, setPresetId] = useState("civilian-standard-v1");
   const [clipName, setClipName] = useState("captured-motion");
-  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>("unverified");
+  const [licenseStatus, setLicenseStatus] = useState<UserLicenseStatus>("unverified");
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [jobs, setJobs] = useState<AssetJob[]>([]);
@@ -68,13 +70,16 @@ export default function AssetLabPage() {
     if (!jobsResponse.ok) throw new Error(`Jobs request failed with HTTP ${jobsResponse.status}.`);
     if (!capabilityResponse.ok) throw new Error(`Capability request failed with HTTP ${capabilityResponse.status}.`);
     const jobsBody = await jobsResponse.json() as { jobs?: unknown[] };
-    const parsedJobs = (jobsBody.jobs ?? []).map(value => AssetJobSchema.parse(value));
-    setJobs(parsedJobs);
+    setJobs((jobsBody.jobs ?? []).map(value => AssetJobSchema.parse(value)));
     setCapabilities(await capabilityResponse.json() as CapabilityResponse);
   }, []);
 
   useEffect(() => {
-    void refresh().catch(error => toast({ title: "Asset Lab unavailable", description: error instanceof Error ? error.message : String(error), variant: "destructive" }));
+    void refresh().catch(error => toast({
+      title: "Asset Lab unavailable",
+      description: error instanceof Error ? error.message : String(error),
+      variant: "destructive",
+    }));
     const interval = window.setInterval(() => void refresh().catch(() => undefined), 2_500);
     return () => window.clearInterval(interval);
   }, [refresh, toast]);
@@ -89,23 +94,20 @@ export default function AssetLabPage() {
     if (!file) return;
     setUploading(true);
     try {
-      const result = await withClientSpan("asset.source.upload", {
+      const uploadedSourceId = await withClientSpan("asset.source.upload", {
         mimeType: file.type,
         bytes: file.size,
       }, async () => {
         const response = await fetch("/api/asset-generation/sources", {
           method: "POST",
-          headers: {
-            "Content-Type": file.type,
-            "X-File-Name": file.name,
-          },
+          headers: { "Content-Type": file.type, "X-File-Name": file.name },
           body: file,
         });
         const body = await response.json() as { source?: { id?: string }; error?: string };
         if (!response.ok || !body.source?.id) throw new Error(body.error ?? `Upload failed with HTTP ${response.status}.`);
         return body.source.id;
       });
-      setSourceId(result);
+      setSourceId(uploadedSourceId);
       setSourceName(file.name);
       toast({ title: "Source uploaded", description: `${file.name} is ready for an asset job.` });
     } catch (error) {
@@ -117,7 +119,11 @@ export default function AssetLabPage() {
 
   const createJob = async () => {
     if (kind !== "human_character" && !sourceId) {
-      toast({ title: "Source required", description: kind === "video_to_animation" ? "Upload a video first." : "Upload an image first.", variant: "destructive" });
+      toast({
+        title: "Source required",
+        description: kind === "video_to_animation" ? "Upload a video first." : "Upload an image first.",
+        variant: "destructive",
+      });
       return;
     }
     setCreating(true);
@@ -178,7 +184,7 @@ export default function AssetLabPage() {
     }
   };
 
-  const mutateJob = async (jobId: string, action: "cancel" | "retry" | "publish") => {
+  const mutateJob = async (jobId: string, action: UserJobAction) => {
     try {
       await withClientSpan(`asset.job.${action}`, { jobId }, async () => {
         const response = await fetch(`/api/asset-generation/jobs/${encodeURIComponent(jobId)}/${action}`, { method: "POST" });
@@ -200,7 +206,7 @@ export default function AssetLabPage() {
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")}><ArrowLeft className="h-4 w-4" /></Button>
             <div>
               <h1 className="text-xl font-semibold">AI Asset Lab</h1>
-              <p className="text-xs text-muted-foreground">GPU generation → Blender headless → validation → review → manifest</p>
+              <p className="text-xs text-muted-foreground">GPU generation → Blender headless → validation → licensed review → manifest</p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => void refresh()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Refresh</Button>
@@ -250,20 +256,18 @@ export default function AssetLabPage() {
                 )}
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium">License status</label>
-                  <Select value={licenseStatus} onValueChange={value => setLicenseStatus(value as LicenseStatus)}>
+                  <label className="text-xs font-medium">Source license state</label>
+                  <Select value={licenseStatus} onValueChange={value => setLicenseStatus(value as UserLicenseStatus)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unverified">Unverified — review required</SelectItem>
-                      <SelectItem value="verified">Verified</SelectItem>
+                      <SelectItem value="unverified">Unverified — admin review required</SelectItem>
                       <SelectItem value="restricted">Restricted — cannot publish</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-[10px] text-muted-foreground">Browser users cannot mark assets as verified.</p>
                 </div>
 
-                <div className="rounded border p-2 text-[10px] text-muted-foreground">
-                  Preferred route: {preferredGenerators.join(" → ")}
-                </div>
+                <div className="rounded border p-2 text-[10px] text-muted-foreground">Preferred route: {preferredGenerators.join(" → ")}</div>
                 <Button className="w-full" disabled={creating || uploading} onClick={() => void createJob()}>
                   {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
                   Queue generation
@@ -275,11 +279,9 @@ export default function AssetLabPage() {
           </div>
 
           <div className="space-y-3">
-            {jobs.length === 0 ? (
-              <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">No asset jobs yet.</CardContent></Card>
-            ) : jobs.map(job => (
-              <JobCard key={job.id} job={job} onAction={mutateJob} />
-            ))}
+            {jobs.length === 0
+              ? <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">No asset jobs yet.</CardContent></Card>
+              : jobs.map(job => <JobCard key={job.id} job={job} onAction={mutateJob} />)}
           </div>
         </div>
       </div>
@@ -297,6 +299,7 @@ function CapabilityCard({ capabilities }: { capabilities: CapabilityResponse | n
             <Readiness label="Blender worker" ready={capabilities.blenderConfigured} />
             <Readiness label="Public callback URL" ready={capabilities.publicBaseUrlConfigured} />
             <Readiness label="Worker authentication" ready={capabilities.workerAuthenticationConfigured} />
+            <Readiness label="Admin asset review" ready={capabilities.assetReviewConfigured} />
             <div className="space-y-1 pt-2">
               {capabilities.providers.map(provider => (
                 <div key={provider.id} className="flex items-center justify-between gap-2 rounded border p-2">
@@ -316,7 +319,7 @@ function Readiness({ label, ready }: { label: string; ready: boolean }) {
   return <div className="flex items-center justify-between"><span>{label}</span>{ready ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}</div>;
 }
 
-function JobCard({ job, onAction }: { job: AssetJob; onAction: (id: string, action: "cancel" | "retry" | "publish") => Promise<void> }) {
+function JobCard({ job, onAction }: { job: AssetJob; onAction: (id: string, action: UserJobAction) => Promise<void> }) {
   const preview = job.artifacts.find(artifact => artifact.kind === "preview" && artifact.mimeType.startsWith("image/"));
   const downloadable = job.artifacts.filter(artifact => ["glb", "animation", "report"].includes(artifact.kind));
   const statusVariant = job.status === "published" ? "default" : job.status === "failed" ? "destructive" : "outline";
@@ -339,7 +342,7 @@ function JobCard({ job, onAction }: { job: AssetJob; onAction: (id: string, acti
         <div className="h-2 overflow-hidden rounded bg-muted"><div className="h-full bg-primary transition-[width]" style={{ width: `${Math.round(job.progress * 100)}%` }} /></div>
         <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
           <span>Generator: {job.selectedGenerator ?? "pending"}</span>
-          <span>License: {job.request.licenseStatus}</span>
+          <span>License: {job.metadata?.licenseStatus ?? job.request.licenseStatus}</span>
           <span>Artifacts: {job.artifacts.length}</span>
         </div>
 
@@ -374,6 +377,11 @@ function JobCard({ job, onAction }: { job: AssetJob; onAction: (id: string, acti
         )}
 
         {job.error && <div className="rounded border border-destructive/50 p-2 text-xs text-destructive">{job.error.code}: {job.error.message}</div>}
+        {job.status === "awaiting_review" && (
+          <div className="rounded border p-2 text-[10px] text-muted-foreground">
+            Preview is ready. A server-side reviewer must verify the license and publish through the protected review API.
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {downloadable.map(artifact => (
@@ -383,11 +391,6 @@ function JobCard({ job, onAction }: { job: AssetJob; onAction: (id: string, acti
               </a>
             </Button>
           ))}
-          {job.status === "awaiting_review" && (
-            <Button size="sm" onClick={() => void onAction(job.id, "publish")}>
-              <ShieldCheck className="mr-1 h-3.5 w-3.5" />Publish
-            </Button>
-          )}
           {job.status === "failed" || job.status === "cancelled" ? (
             <Button size="sm" variant="outline" onClick={() => void onAction(job.id, "retry")}><RefreshCw className="mr-1 h-3.5 w-3.5" />Retry</Button>
           ) : !["published", "awaiting_review"].includes(job.status) ? (
