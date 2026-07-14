@@ -7,6 +7,7 @@ export const AgentRunStatusSchema = z.enum([
   "planned",
   "executing",
   "validating",
+  "publishing",
   "rejected",
   "awaiting_review",
   "completed",
@@ -14,14 +15,24 @@ export const AgentRunStatusSchema = z.enum([
   "cancelled",
 ]);
 
+export const DEFAULT_AGENT_LIMITS = {
+  maxIterations: 12,
+  maxCommands: 80,
+  maxFilesChanged: 40,
+  maxPatchLines: 8_000,
+  maxRuntimeMinutes: 45,
+  maxModelTokens: 250_000,
+  maxCost: 25,
+} as const;
+
 export const AgentLimitsSchema = z.object({
-  maxIterations: z.number().int().min(1).max(100).default(12),
-  maxCommands: z.number().int().min(1).max(1_000).default(80),
-  maxFilesChanged: z.number().int().min(1).max(500).default(40),
-  maxPatchLines: z.number().int().min(1).max(100_000).default(8_000),
-  maxRuntimeMinutes: z.number().int().min(1).max(1_440).default(45),
-  maxModelTokens: z.number().int().min(1_000).max(10_000_000).default(250_000),
-  maxCost: z.number().finite().min(0).max(100_000).default(25),
+  maxIterations: z.number().int().min(1).max(100).default(DEFAULT_AGENT_LIMITS.maxIterations),
+  maxCommands: z.number().int().min(1).max(1_000).default(DEFAULT_AGENT_LIMITS.maxCommands),
+  maxFilesChanged: z.number().int().min(1).max(500).default(DEFAULT_AGENT_LIMITS.maxFilesChanged),
+  maxPatchLines: z.number().int().min(1).max(100_000).default(DEFAULT_AGENT_LIMITS.maxPatchLines),
+  maxRuntimeMinutes: z.number().int().min(1).max(1_440).default(DEFAULT_AGENT_LIMITS.maxRuntimeMinutes),
+  maxModelTokens: z.number().int().min(1_000).max(10_000_000).default(DEFAULT_AGENT_LIMITS.maxModelTokens),
+  maxCost: z.number().finite().min(0).max(100_000).default(DEFAULT_AGENT_LIMITS.maxCost),
 });
 
 export const RepositoryFileSummarySchema = z.object({
@@ -158,7 +169,8 @@ export const AgentTaskSchema = z.object({
   requestedBy: z.string().min(1).max(240),
   allowedPaths: z.array(z.string().min(1).max(1_000)).min(1).max(1_000),
   labels: z.array(z.string().min(1).max(160)).max(100).default([]),
-  limits: AgentLimitsSchema.default({}),
+  createPullRequest: z.boolean().default(true),
+  limits: AgentLimitsSchema.default(DEFAULT_AGENT_LIMITS),
 });
 
 export const AgentRunSchema = z.object({
@@ -225,7 +237,6 @@ export interface CodingTaskResult {
   commands: CommandResult[];
   tests: TestResult[];
   evaluation?: ChangeEvaluation;
-  pullRequestUrl?: string;
 }
 
 export interface PatchReviewInput {
@@ -240,11 +251,24 @@ export interface PatchReviewResult {
   notes: string[];
 }
 
+export interface PublishPullRequestInput {
+  run: AgentRun;
+  repositoryMap: RepositoryMap;
+  plan: CodingTaskPlan;
+  patch: AgentPatch;
+}
+
+export interface PublishPullRequestResult {
+  branchName: string;
+  pullRequestUrl: string;
+}
+
 export interface CodingAgentAdapter {
   readonly id: CodingAgentId;
   analyzeRepository(input: RepositoryAnalysisInput): Promise<RepositoryMap>;
   planTask(input: CodingTaskInput): Promise<CodingTaskPlan>;
   executeTask(input: CodingTaskExecutionInput): Promise<CodingTaskResult>;
   reviewPatch(input: PatchReviewInput): Promise<PatchReviewResult>;
+  publishPullRequest(input: PublishPullRequestInput): Promise<PublishPullRequestResult>;
   stop(runId: string): Promise<void>;
 }
