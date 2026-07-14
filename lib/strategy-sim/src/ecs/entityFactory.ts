@@ -32,6 +32,11 @@ export function createFactionEntity(input: {
   productionPerTick?: Record<string, number>;
   consumptionPerTick?: Record<string, number>;
   aiPolicyId?: string;
+  reputation?: number;
+  operationalSecurity?: number;
+  suspicion?: number;
+  points?: number;
+  blackmailResistance?: number;
 }): StrategyEntity {
   return {
     identity: { id: input.id, kind: "faction", createdTick: input.tick },
@@ -42,6 +47,18 @@ export function createFactionEntity(input: {
       productionPerTick: { credits: 5, supplies: 1, ...input.productionPerTick },
       consumptionPerTick: { credits: 0, supplies: 0, ...input.consumptionPerTick },
       relations: {},
+    },
+    influence: {
+      reputation: input.reputation ?? 70,
+      operationalSecurity: input.operationalSecurity ?? 80,
+      suspicion: input.suspicion ?? 0,
+      points: input.points ?? 0,
+    },
+    blackmail: {
+      resistance: input.blackmailResistance ?? 50,
+      dossiers: {},
+      compromisedBy: {},
+      pendingActions: [],
     },
     ...(input.aiPolicyId
       ? { ai: { policyId: input.aiPolicyId, enabled: true } }
