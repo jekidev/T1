@@ -1,4 +1,4 @@
-import type { StrategySimulationSnapshot } from "@workspace/strategy-sim";
+import type { StrategySimulationSnapshot, SyndicateWorldState } from "@workspace/strategy-sim";
 
 // Core domain types for the Nordlys Command tactical simulation engine.
 // The persisted Scenario.board JSON must match BoardState.
@@ -191,6 +191,7 @@ export interface SimulationState {
   shops: ShopState[];
   skills: SkillState[];
   teamDynamics?: TeamDynamicsState;
+  syndicateWorld?: SyndicateWorldState;
   lastResolution?: string;
 }
 
@@ -215,7 +216,7 @@ export interface BoardState {
 
 export function createEmptyBoard(mapTemplateId: string): BoardState {
   const planningPhaseId = "phase-planning";
-  return { version: 4, mapTemplateId, zones: [], entities: [], layers: [{ id: "layer-default", name: "Ground", visible: true, locked: false, order: 0 }], phases: [{ id: planningPhaseId, name: "Planning", description: "Initial scenario setup and force disposition.", order: 0 }], currentPhaseId: planningPhaseId, timelineEvents: [], moveHistory: [], notes: "", sources: [], tutorialCompleted: false };
+  return { version: 5, mapTemplateId, zones: [], entities: [], layers: [{ id: "layer-default", name: "Ground", visible: true, locked: false, order: 0 }], phases: [{ id: planningPhaseId, name: "Planning", description: "Initial scenario setup and force disposition.", order: 0 }], currentPhaseId: planningPhaseId, timelineEvents: [], moveHistory: [], notes: "", sources: [], tutorialCompleted: false };
 }
 
 export type ScoreKey = "publicSafety" | "evidenceQuality" | "operationalRisk" | "detection" | "civilianImpact" | "resourceUse" | "legitimacy" | "networkDisruption" | "missionObjectives";
