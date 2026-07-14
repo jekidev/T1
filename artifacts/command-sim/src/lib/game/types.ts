@@ -111,7 +111,88 @@ export interface FactionState {
 
 export interface ShopState { id: string; name: string; district: string; reputationRequired: number; scarcity: number; pressure: number; inventory: Array<{ id: string; name: string; price: number; stock: number; quality: number }>; }
 export interface SkillState { id: string; name: string; level: number; experience: number; description: string; }
-export interface SimulationState { seed: number; turn: number; day: number; hour: number; publicConfidence: number; mediaPressure: number; blueTeamCoordination: number; evidenceQuality: number; cityTension: number; economyIndex: number; factions: FactionState[]; shops: ShopState[]; skills: SkillState[]; lastResolution?: string; }
+
+export type TeamSide = "red" | "blue";
+export type PlayerSide = TeamSide | "observer";
+
+export interface PlayerAlignmentSetup {
+  side: PlayerSide;
+  initialSpectrum: number;
+}
+
+export interface AlignmentHistoryEvent {
+  id: string;
+  turn: number;
+  source: "player_action" | "blackmail" | "mission" | "karma_event" | "risk_event";
+  actionType?: PlayerTurnAction["type"];
+  side: TeamSide;
+  spectrumDelta: number;
+  karmaDelta: number;
+  riskDelta: number;
+  reason: string;
+}
+
+export interface PlayerAlignmentProfile {
+  side: PlayerSide;
+  initialSpectrum: number;
+  currentSpectrum: number;
+  karma: number;
+  riskIndex: number;
+  lastChange: number;
+  history: AlignmentHistoryEvent[];
+}
+
+export interface TeamPulseFactor {
+  label: string;
+  value: number;
+  weight: number;
+  contribution: number;
+  detail: string;
+}
+
+export interface TeamPulse {
+  side: TeamSide;
+  moralSpectrum: number;
+  collectiveMorale: number;
+  estimatedSuccess: number;
+  confidence: number;
+  riskPressure: number;
+  alignmentCoherence: number;
+  factors: TeamPulseFactor[];
+  lastUpdatedTurn: number;
+}
+
+export interface TeamDynamicsState {
+  userProfile: PlayerAlignmentProfile;
+  red: TeamPulse;
+  blue: TeamPulse;
+  updatedAtTurn: number;
+}
+
+export interface PlayerTurnAction {
+  type: "invest" | "gather_intelligence" | "reduce_pressure" | "expand_influence" | "train" | "wait";
+  factionId?: string;
+  skillId?: string;
+  amount?: number;
+}
+
+export interface SimulationState {
+  seed: number;
+  turn: number;
+  day: number;
+  hour: number;
+  publicConfidence: number;
+  mediaPressure: number;
+  blueTeamCoordination: number;
+  evidenceQuality: number;
+  cityTension: number;
+  economyIndex: number;
+  factions: FactionState[];
+  shops: ShopState[];
+  skills: SkillState[];
+  teamDynamics?: TeamDynamicsState;
+  lastResolution?: string;
+}
 
 export interface BoardState {
   version: number;
@@ -134,7 +215,7 @@ export interface BoardState {
 
 export function createEmptyBoard(mapTemplateId: string): BoardState {
   const planningPhaseId = "phase-planning";
-  return { version: 3, mapTemplateId, zones: [], entities: [], layers: [{ id: "layer-default", name: "Ground", visible: true, locked: false, order: 0 }], phases: [{ id: planningPhaseId, name: "Planning", description: "Initial scenario setup and force disposition.", order: 0 }], currentPhaseId: planningPhaseId, timelineEvents: [], moveHistory: [], notes: "", sources: [], tutorialCompleted: false };
+  return { version: 4, mapTemplateId, zones: [], entities: [], layers: [{ id: "layer-default", name: "Ground", visible: true, locked: false, order: 0 }], phases: [{ id: planningPhaseId, name: "Planning", description: "Initial scenario setup and force disposition.", order: 0 }], currentPhaseId: planningPhaseId, timelineEvents: [], moveHistory: [], notes: "", sources: [], tutorialCompleted: false };
 }
 
 export type ScoreKey = "publicSafety" | "evidenceQuality" | "operationalRisk" | "detection" | "civilianImpact" | "resourceUse" | "legitimacy" | "networkDisruption" | "missionObjectives";
@@ -149,5 +230,5 @@ export const ADVISOR_ROLES: AdvisorRoleMeta[] = [
   { id: "investigator", name: "Investigator", tagline: "Evidence and case-building focus", description: "Focuses on evidence quality, sources, witnesses and case progression." },
   { id: "legal_reviewer", name: "Legal / Ethics Reviewer", tagline: "Oversight and legitimacy check", description: "Flags authority gaps, proportionality, rights exposure and unsupported claims." },
   { id: "story_director", name: "Story Director", tagline: "Narrative consequences and pacing", description: "Builds coherent storylines and complications from the validated game state." },
-  { id: "red_team_risk_model", name: "Red-Team Game Director", tagline: "Red Team systems, progression and counterplay", description: "Designs Red Team factions, tools, shops, skills, missions, consequences and Blue Team counterplay as game systems." }
+  { id: "red_team_risk_model", name: "Red-Team Game Director", tagline: "Red Team systems, progression and counterplay", description: "Designs Red Team factions, tools, shops, skills, missions, consequences and Blue Team counterplay as game systems." },
 ];
