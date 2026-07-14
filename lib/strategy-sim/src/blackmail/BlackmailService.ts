@@ -89,6 +89,10 @@ export class BlackmailService {
     return { allowed: true };
   }
 
+  canBlackmail(actorFactionId: string, targetFactionId: string): BlackmailEligibility {
+    return this.canExecute(actorFactionId, targetFactionId);
+  }
+
   gatherEvidence(actorFactionId: string, targetFactionId: string, submittedTick = this.simulation.clock.tick + 1): CommandValidationResult {
     return this.simulation.submitCommand({
       id: this.simulation.nextCommandId("blackmail-gather"),
@@ -112,6 +116,10 @@ export class BlackmailService {
         approach,
       },
     });
+  }
+
+  executeBlackmail(actorFactionId: string, targetFactionId: string, approach: BlackmailApproach, submittedTick = this.simulation.clock.tick + 1): CommandValidationResult {
+    return this.execute(actorFactionId, targetFactionId, approach, submittedTick);
   }
 
   private getFaction(factionId: string): StrategyEntity | undefined {
