@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 import { listRagMemory, syncRagIntoPersistentMemory } from "../lib/rag-memory";
 import {
@@ -29,13 +29,14 @@ router.post("/rag/sync", async (_req, res): Promise<void> => {
 });
 
 router.post("/rag/update-world", async (_req, res): Promise<void> => {
-  const sync = await syncRagIntoPersistentMemory();
+  const sync = await syncRagIntoPersistentMemory({ rebuild: true });
   const items = await listRagMemory();
   res.json({
     ...sync,
     ragRevision: await calculateRagRevision(),
     itemCount: items.length,
-    message: "Persistent RAG was rebuilt. NPCs should store this revision and retrieve only role-relevant context on their next deterministic update.",
+    npcUpdateMode: "next_deterministic_tick",
+    message: "Persistent RAG was fully rebuilt from the source files without modifying them. NPCs can now store the new revision and retrieve role-relevant context on their next deterministic update.",
   });
 });
 
@@ -111,7 +112,7 @@ function networkCredentials(req: Request): NetworkSessionCredentials {
   return { sessionId, token };
 }
 
-function sendImportError(res: Parameters<IRouter["post"]>[1] extends never ? never : any, error: unknown): void {
+function sendImportError(res: Response, error: unknown): void {
   if (isNetworkApprovalRequired(error)) {
     res.status(409).json({
       error: error.message,
