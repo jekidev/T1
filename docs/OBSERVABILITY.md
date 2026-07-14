@@ -86,6 +86,8 @@ disableConsoleRecording = true
 enableCanvasRecording = false
 inlineImages = false
 manualStart = true
+network request bodies and headers = disabled
+storageMode = sessionStorage
 ```
 
 The server applies a second redaction layer for:
@@ -99,13 +101,14 @@ The server applies a second redaction layer for:
 - private keys
 - `.env` data
 
-## Retention
+## Retention and replay administration
 
 Self-hosted rrweb fallback defaults to seven days.
 
 ```bash
 SESSION_REPLAY_RETENTION_DAYS=7
 SESSION_REPLAY_ROOT=/persistent/session-replay
+OBSERVABILITY_REPLAY_ADMIN_TOKEN=replace-with-a-separate-admin-token
 ```
 
 Old files are deleted during ingestion and listing. The replay endpoints are:
@@ -116,7 +119,19 @@ GET  /api/observability/replay
 GET  /api/observability/replay/:sessionId
 ```
 
-These endpoints should be placed behind project authentication before public production deployment. Highlight-hosted retention is controlled in Highlight settings.
+The POST endpoint accepts privacy-sanitized, consent-generated rrweb batches. Both GET endpoints are disabled until `OBSERVABILITY_REPLAY_ADMIN_TOKEN` contains at least 24 characters. Retrieval then requires either:
+
+```http
+Authorization: Bearer <admin-token>
+```
+
+or:
+
+```http
+X-Observability-Admin-Token: <admin-token>
+```
+
+This token must never be exposed in frontend build variables. Project authentication and authorization should still protect observability administration in a public production deployment. Highlight-hosted retention is controlled in Highlight settings.
 
 ## Instrumented spans
 
