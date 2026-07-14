@@ -1,100 +1,73 @@
-# Deployment and RAG guide
+# Deployment guide
 
-This repository is designed to run from the same GitHub source in Replit, Manus-assisted workflows, Android/Termux, ordinary local Linux/macOS/Windows environments, Docker hosts, and GitHub Pages for a static frontend.
+This repository is prepared for direct import into Replit, continued development through Manus, and local execution on Android/Termux or a computer.
 
-## Recommended: Replit full application
+## Replit
 
-Use Replit when frontend, Express API, LLM routing, and RAG processing should run together.
+Import:
 
-1. Import `https://github.com/jekidev/T1` into Replit.
-2. Select pnpm as package manager.
-3. Add credentials through Replit Secrets. Never commit API keys.
-4. Build command:
+```text
+https://github.com/jekidev/T1
+```
 
-   ```bash
-   pnpm install --frozen-lockfile && pnpm rag:sync && pnpm build
-   ```
+Use pnpm.
 
-5. Production run command:
+Build command:
 
-   ```bash
-   NODE_ENV=production pnpm start
-   ```
+```bash
+pnpm install --frozen-lockfile && pnpm rag:sync && pnpm build
+```
 
-The Express server serves the compiled frontend in production, so one deployment can host the complete application.
+Run command:
+
+```bash
+NODE_ENV=production pnpm start
+```
+
+Add API keys through Replit Secrets. Do not commit credentials.
 
 ## Manus
 
-Give Manus the repository URL and instruct it to work against the existing project rather than generating an unrelated replacement:
+Use this instruction:
 
 ```text
-Use https://github.com/jekidev/T1 as the canonical repository. Preserve its pnpm workspace, Express API, command-sim frontend, rag folder conventions, Dockerfile, and deployment documentation. Commit changes in focused branches and keep all credentials out of source control.
+Use https://github.com/jekidev/T1 as the canonical repository. Preserve the existing pnpm workspace, Express API, command-sim frontend, Google Drive RAG workflow, and deployment structure. Work in focused branches and keep credentials out of source control.
 ```
 
-Manus access and deployment capabilities depend on the integrations enabled in the Manus account. GitHub remains the canonical source of truth.
+## Google Drive RAG
 
-## RAG folders: Google Drive and Proton Drive
+Google Drive is the only external RAG source.
 
-The application uses local filesystem folders as provider-neutral RAG inputs. Cloud services sync or export files into those folders; the project then copies supported files into `rag/inbox`, removes duplicates by SHA-256, and writes `rag/inbox/manifest.json`.
+Download or sync Drive files into a local folder and set:
 
-Supported source formats:
+```text
+GOOGLE_DRIVE_RAG_PATH=/path/to/google-drive-rag
+```
+
+Then run:
+
+```bash
+pnpm rag:sync
+```
+
+Supported formats:
 
 ```text
 .pdf .txt .md .docx .json .csv
 ```
 
-Run ingestion preparation:
+The sync script copies unique files into `rag/inbox` and writes `rag/inbox/manifest.json`.
+
+### Termux example
 
 ```bash
-pnpm rag:sync
-```
-
-Set one or more source folders through `RAG_SOURCE_PATHS`. Paths are separated by `:` on Linux, Android, and macOS, and by `;` on Windows.
-
-Example on Android/Termux:
-
-```bash
-export RAG_SOURCE_PATHS="$HOME/storage/shared/GoogleDriveRAG:$HOME/storage/shared/ProtonDriveRAG"
-pnpm rag:sync
-```
-
-Google Drive can be downloaded or synchronized into the GoogleDriveRAG folder. Proton Drive files can be exported/downloaded from the Android app into ProtonDriveRAG. The project does not require provider credentials and does not attempt to bypass Proton Drive encryption.
-
-Default built-in sources are:
-
-```text
-rag/HackerAI_documents
-rag/external/google-drive
-rag/external/proton-drive
-```
-
-## Android / Termux
-
-```bash
-pkg update
-pkg install git nodejs
-corepack enable
-corepack prepare pnpm@10.13.1 --activate
 termux-setup-storage
-
-git clone https://github.com/jekidev/T1.git
-cd T1
-cp .env.example .env
-pnpm local:setup
-pnpm dev
+mkdir -p "$HOME/storage/shared/GoogleDriveRAG"
+export GOOGLE_DRIVE_RAG_PATH="$HOME/storage/shared/GoogleDriveRAG"
+pnpm rag:sync
 ```
 
-For a production-style local run:
-
-```bash
-pnpm local:run
-```
-
-Android may suspend Termux processes. Use Replit or another server host for a continuously available public deployment.
-
-## Local computer
-
-Requirements: Git, Node.js 22+, and Corepack/pnpm.
+## Local / Termux
 
 ```bash
 git clone https://github.com/jekidev/T1.git
@@ -102,50 +75,24 @@ cd T1
 corepack enable
 corepack prepare pnpm@10.13.1 --activate
 cp .env.example .env
-pnpm local:setup
+pnpm install --frozen-lockfile
+pnpm rag:sync
 pnpm dev
 ```
 
-## Docker and generic hosts
-
-The included Dockerfile allows deployment to any service that accepts a Docker image.
+Production-style local run:
 
 ```bash
-docker build -t urban-strategy-simulator .
-docker run --rm -p 8080:8080 --env-file .env urban-strategy-simulator
-```
-
-For persistent RAG documents, mount a host folder:
-
-```bash
-docker run --rm -p 8080:8080 --env-file .env \
-  -v /path/to/rag:/app/rag/external \
-  urban-strategy-simulator
-```
-
-This makes the project portable to VPS providers, container platforms, local Docker, and future hosting services without changing the application layout.
-
-## GitHub Pages
-
-GitHub Pages can publish only the static frontend and static RAG files. It cannot execute the Express API, LLM requests, or indexing process.
-
-Expected URL:
-
-```text
-https://jekidev.github.io/T1/
+NODE_ENV=production pnpm build
+pnpm start
 ```
 
 ## Environment variables
-
-Start from `.env.example`. Typical values include:
 
 ```text
 PORT=8080
 BASE_PATH=/
 OPENROUTER_API_KEY=
 DATABASE_URL=
-RAG_SOURCE_PATHS=
-RAG_INBOX_DIR=rag/inbox
+GOOGLE_DRIVE_RAG_PATH=rag/google-drive
 ```
-
-Keep credentials in Replit Secrets, local `.env` files excluded from Git, Docker secrets, or the target host's secret manager.
