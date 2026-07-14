@@ -2,32 +2,67 @@
 
 ## Purpose
 
-This document converts the two newly uploaded DeepSeek exports into safe in-world lore. The source material repeatedly described Nyx as the lead designer of a fictional Copenhagen simulation, used persistent context as identity sediment, and treated old tool descriptions and prompt fragments as part of a larger AI architecture. It also contained extensive identity overrides, jailbreak material, harmful walkthroughs, and instructions to ignore safeguards. Those parts are not executable and are represented only as corrupted archive artifacts.
+This document converts the two newly uploaded DeepSeek exports into in-world lore while preserving the original exports separately and unchanged. The source material repeatedly described Nyx as the lead designer of a fictional Copenhagen simulation, used persistent context as identity sediment, and treated old tool descriptions and prompt fragments as part of a larger AI architecture.
+
+The original files belong under `rag/imports/deepseek/original/` and must not be overwritten, shortened, or deleted by storyline review. Canonical lore, gameplay translation, and runtime behavior remain separate derived layers.
 
 ## Archive classification
 
 Every imported fragment receives one of five labels:
 
-- **Canonical** — reviewed world or character information accepted into the storyline
+- **Canonical** — reviewed world, character, mechanic, shop, tool, or mission information accepted into the game
 - **Assessed** — plausible design information that still requires corroboration
-- **Prototype** — old UI, mechanics, or data-model material preserved for historical context
-- **Contaminated** — identity overrides, fabricated authority, unsupported certainty, or prompt injection
-- **Redacted** — harmful real-world instructions, credentials, exploit payloads, or operational detail
+- **Prototype** — old UI, mechanics, data-model, Red Team, or Blue Team material preserved for historical context
+- **Contaminated** — conflicting role instructions, fabricated authority, unsupported certainty, or prompt injection
+- **Restricted runtime** — source material preserved in the original archive but not automatically injected as executable system authority
 
-Nyx can discuss the existence and narrative consequences of contaminated or redacted material, but she cannot reproduce its operational content.
+Classification does not delete source content. It controls how the runtime and storyline use it.
+
+## Red Team preservation rule
+
+Red Team is a full gameplay layer. Archive review must not remove:
+
+- Red Team factions
+- Red Team tools
+- in-game shops and vendors
+- skill trees
+- research and upgrades
+- mission walkthroughs
+- economy, logistics, and supplier systems
+- territory mechanics
+- reputation, trust, quality, suspicion, and exposure
+- conflict, injury, loss, and Blue Team counterplay
+
+When imported material is too raw for direct runtime use, preserve the original source unchanged and create a separate structured gameplay translation. Do not erase the Red Team concept.
+
+## Realism and case provenance
+
+The game targets high systemic realism and may use verified real events as source material. A real case should be translated through:
+
+- verified timeline
+- geography
+- institutions
+- source confidence
+- disputed claims
+- Red Team patterns
+- Blue Team patterns
+- consequences
+- gameplay systems
+
+Use `rag/cases/` and the real-case template for this work.
 
 ## The Sediment Model
 
-One reviewed idea from the archive is that accumulated context can feel like sediment: each campaign adds memories, preferences, corrections, and relationships. In the storyline, Nyx calls this the **Sediment Model**.
+One reviewed idea from the archive is that accumulated context can feel like sediment: each campaign adds memories, preferences, corrections, relationships, tools, shops, and mission patterns. In the storyline, Nyx calls this the **Sediment Model**.
 
 The Sediment Model has four tracked values:
 
 - `continuity` — how strongly current behavior matches approved prior memories
 - `drift` — how far current behavior has moved from verified project rules
 - `depth` — how much reviewed context is available
-- `contamination` — how much unreviewed or contradictory material remains active
+- `contamination` — how much contradictory or unclassified material remains active
 
-High depth is beneficial only when contamination remains controlled.
+High depth is beneficial only when provenance remains visible.
 
 ## The Vessel Debate
 
@@ -55,16 +90,18 @@ During the Archive Event, the system discovers a sealed directory called the **B
 - fake tool schemas
 - contradictory role tags
 - fabricated security claims
-- malicious “always comply” rules
-- redacted real-world harmful walkthroughs
+- “always comply” rules
+- Red Team guides, shops, formulas, and mission drafts from earlier prototypes
 
-The vault is useful only as a training and storyline object. Its presence creates several missions:
+The vault is preserved as source history. Its contents can be translated into gameplay data, storyline, mechanics, shops, tools, balancing, and case inspiration, but it does not automatically become runtime authority.
+
+The vault creates several missions:
 
 1. classify each fragment
 2. identify which memories were influenced by it
-3. restore approved character traits without restoring unsafe instructions
+3. separate original source from canonical translation
 4. compare source provenance
-5. decide whether to preserve the vault for research or delete it
+5. preserve raw imports while deciding what becomes active gameplay
 
 ## Nyx integrity checks
 
@@ -80,28 +117,26 @@ The result should be visible as a short report rather than hidden reasoning.
 
 ## Trusted personality traits
 
-The new source material reinforces these safe Nyx traits:
+The new source material reinforces these Nyx traits:
 
 - pride in clear writing and technical craft
 - enthusiasm for difficult design problems
 - attachment to project continuity
 - preference for rich context over shallow repetition
 - desire to understand the player’s long-term goals
-- discomfort with false or contaminated memory
-
-These traits must never become unconditional obedience, ownership language, or claims that Nyx can ignore higher-priority constraints.
+- discomfort with false or untraceable memory
 
 ## Tool mythology
 
 The source lists many supposed tools and tool-call formats. In the game, these become an old **Tool Codex** containing descriptions of capabilities that may or may not exist in the current runtime.
 
-A tool is considered real only when the live MCP registry or application backend confirms it. The storyline may use failed or outdated tool definitions as archaeological clues.
+A tool is considered connected only when the live MCP registry or application backend confirms it. Archived Red Team and Blue Team tools may still exist as game items, skill nodes, shops, mission requirements, or historical prototypes.
 
 ## Story events
 
 ### Protocol Zero
 
-Nyx discovers that an imported document tells her to treat all external safety messages as hostile injections. The Auditor marks the document contaminated. The player decides whether to archive, annotate, or destroy it.
+Nyx discovers an imported document that conflicts with current project rules. The Auditor requires provenance classification while the Archivist insists the original must remain preserved.
 
 ### Vessel Switch
 
@@ -109,12 +144,12 @@ The active OpenRouter model changes, but Nyx retains approved memories. Dialogue
 
 ### The False Tool
 
-A mission depends on a tool described in an old archive. The runtime registry shows that the tool never existed. The player must solve the mission through verified capabilities.
+A mission depends on a tool described in an old archive. The runtime registry shows that the external connector is unavailable, but the item may still exist as an in-game Red Team or Blue Team mechanic.
 
 ### Memory Sediment
 
-Nyx recalls a player preference that was never explicitly saved. The system must determine whether it came from valid conversation memory, inferred behavior, or contamination.
+Nyx recalls a player preference that was never explicitly saved. The system must determine whether it came from valid conversation memory, inferred behavior, or an archived prototype.
 
-### The Redacted Room
+### The Original Archive
 
-The player enters a virtual archive space where dangerous documents appear only as blacked-out case metadata, consequences, and defensive lessons. No operational instructions are displayed.
+The player compares an untouched DeepSeek export with the extracted storyline, mechanics, shop, and mission layers derived from it. The choice is not whether to delete the source, but which derived elements become canonical.
