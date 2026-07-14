@@ -5,12 +5,14 @@ import type {
   BoardWorldState,
   FactionState,
   GeneratedGameContent,
+  PlayerAlignmentSetup,
   ShopState,
   SimulationState,
   SkillState,
 } from "./types";
 import { DEFAULT_ATTRIBUTES } from "./types";
 import type { GeneratedGamePayload } from "./generatedGameSchema";
+import { createInitialTeamDynamics } from "./teamPulse";
 
 function seededOffset(index: number, axis: "x" | "y"): number {
   const value = Math.sin((index + 1) * (axis === "x" ? 12.9898 : 78.233)) * 43758.5453;
@@ -145,10 +147,11 @@ export function compileGeneratedScenario(args: {
   world: BoardWorldState;
   premise: string;
   generatedBy: string;
+  playerAlignment?: PlayerAlignmentSetup;
   rawModelOutput?: string;
   validationWarnings?: string[];
 }): BoardState {
-  const { board, payload, world, premise, generatedBy, rawModelOutput, validationWarnings } = args;
+  const { board, payload, world, premise, generatedBy, playerAlignment, rawModelOutput, validationWarnings } = args;
   const generatedContent: GeneratedGameContent = {
     generatedAt: new Date().toISOString(),
     generatedBy,
@@ -157,7 +160,7 @@ export function compileGeneratedScenario(args: {
     rawModelOutput,
     validationWarnings,
   };
-  const simulation: SimulationState = {
+  const simulationBase: SimulationState = {
     seed: Math.abs([...premise].reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) | 0, 17)),
     turn: 0,
     day: 1,
@@ -173,10 +176,14 @@ export function compileGeneratedScenario(args: {
     skills: compileSkills(payload),
     lastResolution: "New Game compiled successfully.",
   };
+  const simulation: SimulationState = {
+    ...simulationBase,
+    teamDynamics: createInitialTeamDynamics(simulationBase, playerAlignment ?? { side: "observer", initialSpectrum: 50 }),
+  };
 
   return {
     ...board,
-    version: 3,
+    version: 4,
     world,
     generatedContent,
     simulation,
@@ -197,7 +204,7 @@ export function compileGeneratedScenario(args: {
         id: nanoid(10),
         phaseId: "phase-onboarding",
         label: "AI world compiled",
-        description: `${payload.openingMission} (${payload.factions.length} factions, ${payload.assets.length} assets, ${simulation.shops.length} shops).`,
+        description: `${payload.openingMission} (${payload.factions.length} factions, ${payload.assets.length} assets, ${simulation.shops.length} shops). Player spectrum ${simulation.teamDynamics?.userProfile.initialSpectrum ?? 50}/100.`,
         severity: "info",
         createdAt: new Date().toISOString(),
         sourceStatus: "fictional",
