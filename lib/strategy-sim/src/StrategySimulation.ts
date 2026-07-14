@@ -26,6 +26,7 @@ export interface StrategySimulationOptions {
 export interface StrategySimulationSnapshot {
   schemaVersion: 1;
   clock: SimulationClockState;
+  scheduledTickAccumulator: number;
   randomState: number;
   idCounters: Record<string, number>;
   entities: StrategyEntity[];
@@ -54,8 +55,14 @@ export class StrategySimulation {
   readonly subsystemStatus: StrategySubsystemStatus[];
 
   private readonly systems: SimulationSystem[];
+  private scheduledTickAccumulator = 0;
 
   constructor(options: StrategySimulationOptions = {}) {
+    const localStrategyInterval = options.localStrategyDecisionIntervalTicks ?? 20;
+    if (!Number.isInteger(localStrategyInterval) || localStrategyInterval < 1) {
+      throw new Error("localStrategyDecisionIntervalTicks must be a positive integer.");
+    }
+
     this.clock = new SimulationClock({ tickRate: options.tickRate ?? 20 });
     this.random = new DeterministicRandom(options.seed ?? 1);
 
@@ -65,7 +72,7 @@ export class StrategySimulation {
 
     this.systems = [
       new CommandSystem(),
-      new LocalStrategySystem(options.localStrategyDecisionIntervalTicks ?? 20),
+      new LocalStrategySystem(localStrategyInterval),
       tactical,
       path,
       new MovementSystem(),
@@ -119,8 +126,10 @@ export class StrategySimulation {
 
   runScheduledFrame(): number {
     if (this.clock.paused) return 0;
-    const ticks = Math.max(1, Math.round(this.clock.speedMultiplier));
-    this.step(ticks);
+    this.scheduledTickAccumulator += this.clock.speedMultiplier;
+    const ticks = Math.floor(this.scheduledTickAccumulator);
+    this.scheduledTickAccumulator -= ticks;
+    if (ticks > 0) this.step(ticks);
     return ticks;
   }
 
@@ -146,6 +155,7 @@ export class StrategySimulation {
     return {
       schemaVersion: 1,
       clock: this.clock.exportState(),
+      scheduledTickAccumulator: this.scheduledTickAccumulator,
       randomState: this.random.exportState(),
       idCounters: this.ids.exportState(),
       entities: this.world.allSorted().map(entity => structuredClone(entity)),
@@ -160,6 +170,7 @@ export class StrategySimulation {
     this.world.clear();
     for (const entity of snapshot.entities) this.world.add(structuredClone(entity));
     this.clock.importState(snapshot.clock);
+    this.scheduledTickAccumulator = snapshot.scheduledTickAccumulator;
     this.random.importState(snapshot.randomState);
     this.ids.importState(snapshot.idCounters);
     this.commands.importPending(snapshot.pendingCommands);
