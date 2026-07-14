@@ -22,10 +22,12 @@ export class CodingAgentService {
   private readonly adapters: CodingAgentAdapter[];
   private readonly manager: CodingAgentRunManager;
   private readonly inFlight = new Map<string, Promise<AgentRun>>();
+  private readonly maximumConcurrentRuns: number;
   private initialized = false;
 
   constructor() {
     this.adapters = configuredAdapters();
+    this.maximumConcurrentRuns = positiveInteger(process.env.CODING_AGENT_MAX_CONCURRENT_RUNS, 2);
     this.manager = new CodingAgentRunManager(this.adapters, {
       emit: (type, run, detail) => this.observeRun(type, run, detail),
     });
@@ -50,6 +52,7 @@ export class CodingAgentService {
     directDefaultBranchWrite: false;
     localShellExecution: false;
     humanReviewRequired: true;
+    maximumConcurrentRuns: number;
   } {
     const configured = new Set(this.adapters.map(adapter => adapter.id));
     return {
@@ -65,6 +68,7 @@ export class CodingAgentService {
       directDefaultBranchWrite: false,
       localShellExecution: false,
       humanReviewRequired: true,
+      maximumConcurrentRuns: this.maximumConcurrentRuns,
     };
   }
 
@@ -95,6 +99,15 @@ export class CodingAgentService {
     if (!this.adapters.some(adapter => adapter.id === task.requestedAdapter)) {
       throw new Error(`Coding-agent adapter ${task.requestedAdapter} is not configured.`);
     }
+    const runId = `agent-run-${task.id}`;
+    try {
+      await codingAgentStorage.readRun(runId);
+      throw new Error(`Coding-agent task id already exists: ${task.id}`);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Coding-agent task id already exists:")) throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code && code !== "ENOENT") throw error;
+    }
     const map = await this.repositoryMap(false);
     const run = this.manager.createRun(task, map);
     await codingAgentStorage.saveRun(run);
@@ -104,6 +117,9 @@ export class CodingAgentService {
   async startRun(runId: string): Promise<AgentRun> {
     await this.initialize();
     if (this.inFlight.has(runId)) return this.getRun(runId);
+    if (this.inFlight.size >= this.maximumConcurrentRuns) {
+      throw new Error(`Coding-agent concurrency limit reached (${this.maximumConcurrentRuns}).`);
+    }
     const run = await this.ensureImported(runId);
     if (TERMINAL_STATUSES.has(run.status)) throw new Error(`Run cannot start from status ${run.status}.`);
     const map = await this.repositoryMap(false);
@@ -217,7 +233,7 @@ function interruptedRun(run: AgentRun): AgentRun {
     updatedAt: now,
     error: {
       code: "agent.server_restarted",
-      message: "The API process restarted while the external coding-agent run was active. Inspect the sandbox worker and create a new run or explicitly retry from a fresh base commit.",
+      message: "The API process restarted while the external coding-agent run was active. Inspect the sandbox worker and create a new run from a fresh base commit.",
     },
     auditEvents: [
       ...run.auditEvents,
