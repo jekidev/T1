@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyPlayerTurnToTeamDynamics, createInitialTeamDynamics, moralSpectrumLabel } from "./teamPulse";
+import {
+  applyPlayerTurnToTeamDynamics,
+  createInitialTeamDynamics,
+  moralSpectrumLabel,
+  recalculateTeamDynamics,
+} from "./teamPulse";
 import type { SimulationState } from "./types";
 
 function createSimulation(): SimulationState {
@@ -30,7 +35,9 @@ void test("Red and Blue success estimates are complementary", () => {
   const dynamics = simulation.teamDynamics!;
   assert.equal(Math.round((dynamics.red.estimatedSuccess + dynamics.blue.estimatedSuccess) * 10) / 10, 100);
   assert.ok(dynamics.red.factors.length > 0);
-  assert.ok(dynamics.blue.confidence >= 0 && dynamics.blue.confidence <= 100);
+  assert.ok(dynamics.blue.factors.length > 0);
+  assert.ok(dynamics.red.confidence >= 0 && dynamics.red.confidence <= 100);
+  assert.ok(dynamics.blue.collectiveMorale >= 0 && dynamics.blue.collectiveMorale <= 100);
 });
 
 void test("risk-reducing actions move player spectrum and karma positively", () => {
@@ -50,8 +57,26 @@ void test("aggressive influence increases risk and can lower spectrum", () => {
   assert.ok(next.userProfile.riskIndex > before.teamDynamics!.userProfile.riskIndex);
 });
 
+void test("same state and action produce identical replay output", () => {
+  const beforeA = createSimulation();
+  const beforeB = structuredClone(beforeA);
+  const afterA = { ...beforeA, turn: 1, cityTension: 28, evidenceQuality: 34 };
+  const afterB = structuredClone(afterA);
+  const resultA = applyPlayerTurnToTeamDynamics(beforeA, afterA, { type: "gather_intelligence", factionId: "red-1", amount: 10 });
+  const resultB = applyPlayerTurnToTeamDynamics(beforeB, afterB, { type: "gather_intelligence", factionId: "red-1", amount: 10 });
+  assert.deepEqual(resultA, resultB);
+  assert.match(resultA.userProfile.history[0]!.id, /^alignment-1-player_action-red-gather_intelligence-/);
+});
+
+void test("recalculation is idempotent for an unchanged turn", () => {
+  const simulation = createSimulation();
+  const once = recalculateTeamDynamics(simulation, simulation.teamDynamics!);
+  const twice = recalculateTeamDynamics(simulation, once);
+  assert.deepEqual(twice, once);
+});
+
 void test("spectrum labels cover the full 0 to 100 scale", () => {
-  assert.equal(moralSpectrumLabel(0), "Extremely destructive");
-  assert.equal(moralSpectrumLabel(50), "Morally mixed");
-  assert.equal(moralSpectrumLabel(100), "Altruistic ideal");
+  assert.match(moralSpectrumLabel(0), /destruktiv/i);
+  assert.match(moralSpectrumLabel(50), /blandet/i);
+  assert.match(moralSpectrumLabel(100), /altruistisk/i);
 });
