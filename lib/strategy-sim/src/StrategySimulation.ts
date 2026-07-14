@@ -9,6 +9,7 @@ import { DeterministicIdFactory } from "./ecs/entityFactory";
 import type { StrategyEntity } from "./ecs/components";
 import { StrategyWorld } from "./ecs/world";
 import { EventLog, type GameEvent } from "./events/EventLog";
+import { CharacterStatusSystem } from "./systems/CharacterStatusSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { CommandSystem } from "./systems/CommandSystem";
 import { EconomySystem } from "./systems/EconomySystem";
@@ -16,6 +17,7 @@ import { DisabledExtensionSystem, FinalizeSystem } from "./systems/ExtensionSyst
 import { LocalStrategySystem } from "./systems/LocalStrategySystem";
 import { MoraleCleanupSystem } from "./systems/MoraleCleanupSystem";
 import { MovementSystem } from "./systems/MovementSystem";
+import { NpcRoutineSystem } from "./systems/NpcRoutineSystem";
 import { ProductionSystem } from "./systems/ProductionSystem";
 import { TerritorySystem } from "./systems/TerritorySystem";
 import { SYSTEM_ORDER, type SimulationSystem, type SimulationSystemContext, type SystemId } from "./systems/types";
@@ -29,6 +31,7 @@ export interface StrategySimulationOptions {
   seed?: number;
   tickRate?: number;
   localStrategyDecisionIntervalTicks?: number;
+  ticksPerGameMinute?: number;
   blackmail?: Partial<BlackmailConfig>;
 }
 
@@ -73,19 +76,24 @@ export class StrategySimulation {
     if (!Number.isInteger(localStrategyInterval) || localStrategyInterval < 1) {
       throw new Error("localStrategyDecisionIntervalTicks must be a positive integer.");
     }
+    const ticksPerGameMinute = options.ticksPerGameMinute ?? 20;
+    if (!Number.isFinite(ticksPerGameMinute) || ticksPerGameMinute <= 0) {
+      throw new Error("ticksPerGameMinute must be positive.");
+    }
 
     this.clock = new SimulationClock({ tickRate: options.tickRate ?? 20 });
     this.random = new DeterministicRandom(options.seed ?? 1);
 
-    const tactical = new DisabledExtensionSystem("tactical-intent", "Mistreevous is deferred until Phase C.");
+    const tactical = new DisabledExtensionSystem("tactical-intent", "Mistreevous is deferred until the behavior-tree adapter is enabled.");
     const blackmailSystem = new BlackmailSystem(options.blackmail);
-    const path = new DisabledExtensionSystem("path-intent", "Recast Navigation JS is deferred until Phase B.");
+    const path = new DisabledExtensionSystem("path-intent", "Recast Navigation JS is deferred until the navigation adapter is enabled.");
     const collision = new DisabledExtensionSystem("collision-avoidance", "Rapier strategy collision integration is deferred until the navigation contract exists.");
 
     this.blackmailConfig = blackmailSystem.config;
     this.systems = [
       new CommandSystem(),
       new LocalStrategySystem(localStrategyInterval),
+      new NpcRoutineSystem(ticksPerGameMinute),
       tactical,
       blackmailSystem,
       path,
@@ -95,6 +103,7 @@ export class StrategySimulation {
       new EconomySystem(),
       new ProductionSystem(),
       new TerritorySystem(),
+      new CharacterStatusSystem(),
       new MoraleCleanupSystem(),
       new FinalizeSystem(),
     ];
