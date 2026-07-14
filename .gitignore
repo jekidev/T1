@@ -14,6 +14,7 @@ node_modules
 # Runtime-generated data
 /data/asset-pipeline/
 /data/session-replay/
+/data/world/
 /services/asset-worker/work/
 
 # Python worker caches
