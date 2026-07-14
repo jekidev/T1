@@ -16,6 +16,13 @@ export interface NetworkAccessSession {
   mode: NetworkAccessMode;
   createdAt: string;
   expiresAt: string;
+  ultraApprovedBy?: string;
+  ultraApprovedAt?: string;
+}
+
+export interface UltraNetworkApproval {
+  approvedBy: string;
+  confirmation: "ENABLE ULTRA";
 }
 
 export interface ResolvedPublicAddress {
@@ -58,20 +65,30 @@ const APPROVAL_TTL_MS = 15 * 60 * 1000;
 export function createNetworkSession(input: {
   mode?: NetworkAccessMode;
   ttlMinutes?: number;
+  ultraApproval?: UltraNetworkApproval;
 }): { session: NetworkAccessSession; token: string } {
   purgeExpired();
   const now = Date.now();
   const ttl = Math.min(SESSION_MAX_MS, Math.max(5 * 60 * 1000, Math.trunc((input.ttlMinutes ?? 120) * 60 * 1000)));
   const token = randomBytes(32).toString("base64url");
+  const mode = input.mode ?? "ask_first";
+  const ultraApproval = mode === "ultra" ? validateUltraApproval(input.ultraApproval) : undefined;
   const session: InternalSession = {
     id: `network-${randomUUID()}`,
-    mode: input.mode ?? "ask_first",
+    mode,
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + ttl).toISOString(),
     secret: token,
+    ...(ultraApproval ? {
+      ultraApprovedBy: ultraApproval.approvedBy,
+      ultraApprovedAt: new Date(now).toISOString(),
+    } : {}),
   };
   sessions.set(session.id, session);
-  audit("network.session.created", session, { mode: session.mode });
+  audit("network.session.created", session, {
+    mode: session.mode,
+    ultraApprovedBy: session.ultraApprovedBy,
+  });
   return { session: publicSession(session), token };
 }
 
@@ -79,10 +96,22 @@ export function updateNetworkSession(input: {
   sessionId: string;
   token: string;
   mode: NetworkAccessMode;
+  ultraApproval?: UltraNetworkApproval;
 }): NetworkAccessSession {
   const session = requireSession(input.sessionId, input.token);
+  if (input.mode === "ultra") {
+    const approval = validateUltraApproval(input.ultraApproval);
+    session.ultraApprovedBy = approval.approvedBy;
+    session.ultraApprovedAt = new Date().toISOString();
+  } else {
+    delete session.ultraApprovedBy;
+    delete session.ultraApprovedAt;
+  }
   session.mode = input.mode;
-  audit("network.session.mode_changed", session, { mode: input.mode });
+  audit("network.session.mode_changed", session, {
+    mode: input.mode,
+    ultraApprovedBy: session.ultraApprovedBy,
+  });
   return publicSession(session);
 }
 
@@ -135,12 +164,16 @@ export async function requireNetworkAccess(input: {
   if (!reason) throw new Error("A concrete reason is required for internet access.");
 
   if (session.mode === "ultra") {
+    if (!session.ultraApprovedBy || !session.ultraApprovedAt) {
+      throw new Error("Ultra session is missing its explicit approval record.");
+    }
     const resolvedAddresses = await resolvePublicAddresses(url.hostname);
     audit("network.request.auto_approved", session, {
       capability: input.capability,
       targetOrigin: url.origin,
       targetPath,
       mode: "ultra",
+      ultraApprovedBy: session.ultraApprovedBy,
       resolvedAddressCount: resolvedAddresses.length,
     });
     return { session: publicSession(session), url, mode: session.mode, resolvedAddresses };
@@ -194,7 +227,7 @@ export async function requireNetworkAccess(input: {
     approvalId: approval.id,
     capability: approval.capability,
     targetOrigin: approval.targetOrigin,
-    targetPath: approval.targetPath,
+    targetPath,
   });
   throw new NetworkApprovalRequiredError({ ...approval });
 }
@@ -231,6 +264,15 @@ export async function resolvePublicAddresses(hostnameInput: string): Promise<Res
   return unique;
 }
 
+function validateUltraApproval(input: UltraNetworkApproval | undefined): UltraNetworkApproval {
+  if (!input || input.confirmation !== "ENABLE ULTRA") {
+    throw new Error("Ultra requires the exact confirmation phrase ENABLE ULTRA.");
+  }
+  const approvedBy = input.approvedBy.trim().slice(0, 240);
+  if (!approvedBy) throw new Error("Ultra requires an explicit approving user identity.");
+  return { approvedBy, confirmation: "ENABLE ULTRA" };
+}
+
 function requireSession(sessionId: string, token: string): InternalSession {
   purgeExpired();
   const session = sessions.get(sessionId);
@@ -250,7 +292,14 @@ function purgeExpired(): void {
 }
 
 function publicSession(session: InternalSession): NetworkAccessSession {
-  return { id: session.id, mode: session.mode, createdAt: session.createdAt, expiresAt: session.expiresAt };
+  return {
+    id: session.id,
+    mode: session.mode,
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
+    ...(session.ultraApprovedBy ? { ultraApprovedBy: session.ultraApprovedBy } : {}),
+    ...(session.ultraApprovedAt ? { ultraApprovedAt: session.ultraApprovedAt } : {}),
+  };
 }
 
 function exactTargetPath(url: URL): string {
