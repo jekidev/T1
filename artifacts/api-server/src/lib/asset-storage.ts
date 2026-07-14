@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   AssetJobSchema,
@@ -16,6 +16,11 @@ export interface StoredBinary {
   byteLength: number;
   sha256: string;
   originalName?: string;
+}
+
+interface StreamWriteResult {
+  byteLength: number;
+  sha256: string;
 }
 
 export class AssetStorage {
@@ -35,44 +40,72 @@ export class AssetStorage {
   }
 
   async saveSource(input: Buffer, mimeType: string, originalName?: string): Promise<StoredBinary> {
+    return this.saveSourceStream(singleChunk(input), mimeType, originalName, input.byteLength);
+  }
+
+  async saveSourceStream(
+    input: AsyncIterable<Uint8Array>,
+    mimeType: string,
+    originalName: string | undefined,
+    maximumBytes: number,
+  ): Promise<StoredBinary> {
     await this.initialize();
     const id = `source-${randomUUID()}`;
     const extension = extensionForMime(mimeType);
     const filePath = path.join(this.sourcesDir(), `${id}${extension}`);
-    await writeFile(filePath, input, { flag: "wx" });
-    const stored = binaryRecord(id, filePath, mimeType, input, originalName);
+    const written = await writeStream(filePath, input, maximumBytes);
+    const stored = binaryRecord(id, filePath, mimeType, written, originalName);
     await writeFile(`${filePath}.json`, JSON.stringify(stored, null, 2));
     return stored;
   }
 
-  async readSource(id: string): Promise<{ metadata: StoredBinary; content: Buffer }> {
+  async getSource(id: string): Promise<StoredBinary> {
     await this.initialize();
     const metadataPath = await this.findMetadataFile(this.sourcesDir(), id);
-    const metadata = JSON.parse(await readFile(metadataPath, "utf8")) as StoredBinary;
+    return JSON.parse(await readFile(metadataPath, "utf8")) as StoredBinary;
+  }
+
+  async readSource(id: string): Promise<{ metadata: StoredBinary; content: Buffer }> {
+    const metadata = await this.getSource(id);
     return { metadata, content: await readFile(metadata.path) };
   }
 
   async saveArtifact(jobId: string, kind: AssetArtifact["kind"], content: Buffer, mimeType: string): Promise<AssetArtifact> {
+    return this.saveArtifactStream(jobId, kind, singleChunk(content), mimeType, content.byteLength);
+  }
+
+  async saveArtifactStream(
+    jobId: string,
+    kind: AssetArtifact["kind"],
+    input: AsyncIterable<Uint8Array>,
+    mimeType: string,
+    maximumBytes: number,
+  ): Promise<AssetArtifact> {
     await this.initialize();
     const safeJobId = safeSegment(jobId);
     const jobDir = path.join(this.artifactsDir(), safeJobId);
     await mkdir(jobDir, { recursive: true });
     const extension = extensionForMime(mimeType);
     const filePath = path.join(jobDir, `${safeSegment(kind)}-${randomUUID()}${extension}`);
-    await writeFile(filePath, content, { flag: "wx" });
+    const written = await writeStream(filePath, input, maximumBytes);
     return {
       kind,
       path: filePath,
       mimeType,
-      byteLength: content.byteLength,
-      sha256: sha256(content),
+      byteLength: written.byteLength,
+      sha256: written.sha256,
     };
   }
 
-  async readArtifact(jobId: string, sha: string): Promise<{ artifact: AssetArtifact; content: Buffer }> {
+  async getArtifact(jobId: string, sha: string): Promise<AssetArtifact> {
     const job = await this.readJob(jobId);
     const artifact = job.artifacts.find(item => item.sha256 === sha);
     if (!artifact) throw new Error("Artifact not found.");
+    return artifact;
+  }
+
+  async readArtifact(jobId: string, sha: string): Promise<{ artifact: AssetArtifact; content: Buffer }> {
+    const artifact = await this.getArtifact(jobId, sha);
     return { artifact, content: await readFile(artifact.path) };
   }
 
@@ -95,7 +128,7 @@ export class AssetStorage {
       try {
         jobs.push(AssetJobSchema.parse(JSON.parse(await readFile(path.join(this.jobsDir(), file), "utf8"))));
       } catch {
-        // A corrupt record is skipped and surfaced by server logs instead of crashing the listing endpoint.
+        // A corrupt record is skipped instead of crashing the job-list endpoint.
       }
     }
     return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -138,19 +171,53 @@ export class AssetStorage {
   private manifestPath(): string { return path.join(this.publishedDir(), "manifest.json"); }
 }
 
-function binaryRecord(id: string, filePath: string, mimeType: string, content: Buffer, originalName?: string): StoredBinary {
+async function writeStream(
+  filePath: string,
+  input: AsyncIterable<Uint8Array>,
+  maximumBytes: number,
+): Promise<StreamWriteResult> {
+  if (!Number.isFinite(maximumBytes) || maximumBytes < 1) throw new Error("A positive stream byte limit is required.");
+  const handle = await open(filePath, "wx");
+  const hash = createHash("sha256");
+  let byteLength = 0;
+  try {
+    for await (const chunk of input) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      byteLength += buffer.byteLength;
+      if (byteLength > maximumBytes) throw new Error(`Upload exceeds the ${maximumBytes}-byte limit.`);
+      hash.update(buffer);
+      await handle.write(buffer);
+    }
+    if (byteLength === 0) throw new Error("Uploaded content is empty.");
+    return { byteLength, sha256: hash.digest("hex") };
+  } catch (error) {
+    await handle.close();
+    await rm(filePath, { force: true });
+    throw error;
+  } finally {
+    try { await handle.close(); } catch { /* already closed after failure */ }
+  }
+}
+
+async function* singleChunk(content: Buffer): AsyncIterable<Uint8Array> {
+  yield content;
+}
+
+function binaryRecord(
+  id: string,
+  filePath: string,
+  mimeType: string,
+  written: StreamWriteResult,
+  originalName?: string,
+): StoredBinary {
   return {
     id,
     path: filePath,
     mimeType,
-    byteLength: content.byteLength,
-    sha256: sha256(content),
+    byteLength: written.byteLength,
+    sha256: written.sha256,
     ...(originalName ? { originalName: originalName.slice(0, 255) } : {}),
   };
-}
-
-function sha256(content: Buffer): string {
-  return createHash("sha256").update(content).digest("hex");
 }
 
 function safeSegment(value: string): string {
