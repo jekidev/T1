@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Brain, Building2, Clock3, Coins, Play, ShieldAlert, Users } from "lucide-react";
 import type { BoardState, PlayerTurnAction } from "@/lib/game";
+import type { BoardBlackmailAction } from "@/lib/strategy/boardStrategyBridge";
+import { BlackmailPanel } from "./blackmail-panel";
 
 interface SimulationPanelProps {
   board: BoardState;
   onResolve: (action: PlayerTurnAction) => void;
+  onBlackmail: (action: BoardBlackmailAction) => void;
 }
 
 const ACTIONS: Array<{ id: PlayerTurnAction["type"]; label: string; description: string }> = [
@@ -20,11 +23,17 @@ const ACTIONS: Array<{ id: PlayerTurnAction["type"]; label: string; description:
   { id: "wait", label: "Wait", description: "Advance the world without a targeted player action." },
 ];
 
-export function SimulationPanel({ board, onResolve }: SimulationPanelProps) {
+export function SimulationPanel({ board, onResolve, onBlackmail }: SimulationPanelProps) {
   const simulation = board.simulation;
   const [actionType, setActionType] = useState<PlayerTurnAction["type"]>("gather_intelligence");
   const [factionId, setFactionId] = useState(simulation?.factions[0]?.id ?? "");
   const selectedAction = useMemo(() => ACTIONS.find(action => action.id === actionType), [actionType]);
+
+  useEffect(() => {
+    if (!simulation?.factions.some(faction => faction.id === factionId)) {
+      setFactionId(simulation?.factions[0]?.id ?? "");
+    }
+  }, [simulation, factionId]);
 
   if (!simulation) {
     return <Card><CardHeader><CardTitle className="text-sm">Simulation unavailable</CardTitle></CardHeader><CardContent className="text-xs text-muted-foreground">This scenario predates the scenario compiler. Create a new AI game or migrate the board to initialize deterministic simulation state.</CardContent></Card>;
@@ -46,6 +55,8 @@ export function SimulationPanel({ board, onResolve }: SimulationPanelProps) {
       <p className="text-[10px] text-muted-foreground">{selectedAction?.description}</p>
       <Button className="w-full h-8 text-xs" onClick={() => onResolve({ type: actionType, factionId, amount: 10 })}><Play className="mr-2 h-3 w-3" />Resolve turn</Button>
     </CardContent></Card>
+
+    <BlackmailPanel board={board} actorFactionId={factionId} onAction={onBlackmail} />
 
     <div className="space-y-2"><h4 className="text-xs font-semibold">Factions</h4>{simulation.factions.map(faction => <div key={faction.id} className="rounded border p-2 text-[10px]"><div className="flex justify-between font-medium"><span>{faction.name}</span><Badge variant={faction.faction === "criminal" ? "destructive" : "outline"} className="text-[9px]">{faction.faction}</Badge></div><div className="mt-1 grid grid-cols-3 gap-1 text-muted-foreground"><span><Coins className="inline h-3 w-3" /> {faction.treasury.toLocaleString()}</span><span><Users className="inline h-3 w-3" /> {faction.personnel}</span><span>Suspicion {faction.suspicion}</span><span>Cohesion {faction.cohesion}</span><span>Intel {faction.intelligence}</span><span>Legitimacy {faction.legitimacy}</span></div></div>)}</div>
 
