@@ -1,4 +1,5 @@
 import {
+  AgentNetworkAuditSchema,
   AgentPatchSchema,
   ChangeEvaluationSchema,
   CodingTaskPlanSchema,
@@ -62,6 +63,7 @@ export class RemoteCodingAgentAdapter implements CodingAgentAdapter {
       commands: Array.isArray(response.commands) ? response.commands.map(value => CommandResultSchema.parse(value)) : [],
       tests: Array.isArray(response.tests) ? response.tests.map(value => TestResultSchema.parse(value)) : [],
       ...(response.evaluation ? { evaluation: ChangeEvaluationSchema.parse(response.evaluation) } : {}),
+      networkAudit: AgentNetworkAuditSchema.parse(response.networkAudit),
     };
   }
 
@@ -81,8 +83,8 @@ export class RemoteCodingAgentAdapter implements CodingAgentAdapter {
   }
 
   async publishPullRequest(input: PublishPullRequestInput): Promise<PublishPullRequestResult> {
-    if (!input.run.policyDecision?.accepted || !input.run.patch || !input.run.plan) {
-      throw new Error("A validated plan, patch and accepted policy decision are required before publication.");
+    if (!input.run.policyDecision?.accepted || !input.run.patch || !input.run.plan || !input.run.networkAudit) {
+      throw new Error("A validated plan, patch, network audit and accepted policy decision are required before publication.");
     }
     const response = await this.request("publish", input);
     if (typeof response.pullRequestUrl !== "string" || typeof response.branchName !== "string") {
