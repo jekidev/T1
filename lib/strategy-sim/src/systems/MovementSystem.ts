@@ -7,7 +7,10 @@ export class MovementSystem implements SimulationSystem {
 
   update(context: SimulationSystemContext): void {
     const deltaSeconds = context.clock.tickDurationSeconds;
-    for (const entity of context.world.queries.moving) {
+    const movingEntities = [...context.world.queries.moving]
+      .sort((a, b) => a.identity.id.localeCompare(b.identity.id));
+
+    for (const entity of movingEntities) {
       if (entity.health.current <= 0 || !entity.movement.target) continue;
 
       const current = entity.transform.position;
