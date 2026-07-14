@@ -15,8 +15,10 @@ import { PropertiesSidebar } from "./sidebar-right";
 import { ScoringPanel } from "./scoring-panel";
 import { AdvisorPanel } from "./advisor-panel";
 import { DeveloperAiPanel } from "./developer-ai-panel";
+import { WorldMapUnderlay } from "./world-map-underlay";
+import { WorldSetupPanel } from "./world-setup-panel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, Clock, Loader2, Code2 } from "lucide-react";
+import { ArrowLeft, Save, Download, Clock, Loader2, Code2, MapPin, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
@@ -37,12 +39,12 @@ export default function BoardPage() {
   });
   
   const updateMutation = useUpdateScenario();
-  
   const { loadBoard, board, scenarioName } = useBoardStore();
   
   const [initializedId, setInitializedId] = useState<string | null>(null);
   const [autosaveTime, setAutosaveTime] = useState<string | null>(readAutosaveTimestamp());
   const [developerPanelOpen, setDeveloperPanelOpen] = useState(false);
+  const [worldSetupOpen, setWorldSetupOpen] = useState(false);
 
   useEffect(() => {
     const data = isTutorial ? tutorialQuery.data : scenarioQuery.data;
@@ -53,9 +55,7 @@ export default function BoardPage() {
   }, [scenarioQuery.data, tutorialQuery.data, id, initializedId, isTutorial, loadBoard]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAutosaveTime(readAutosaveTimestamp());
-    }, 10000);
+    const interval = setInterval(() => setAutosaveTime(readAutosaveTimestamp()), 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -65,12 +65,7 @@ export default function BoardPage() {
       return;
     }
     try {
-      await updateMutation.mutateAsync({
-        id: scenarioId,
-        data: {
-          board: board as any
-        }
-      });
+      await updateMutation.mutateAsync({ id: scenarioId, data: { board: board as any } });
       toast({ title: "Scenario saved successfully." });
     } catch {
       toast({ title: "Failed to save", variant: "destructive" });
@@ -94,97 +89,55 @@ export default function BoardPage() {
   }
 
   if (!isTutorial && scenarioQuery.isError) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4">
-        <div className="text-destructive font-bold text-xl">Failed to load scenario</div>
-        <Button onClick={() => setLocation("/")}>Return Home</Button>
-      </div>
-    );
+    return <div className="flex h-screen w-full items-center justify-center bg-background flex-col gap-4"><div className="text-destructive font-bold text-xl">Failed to load scenario</div><Button onClick={() => setLocation("/")}>Return Home</Button></div>;
   }
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-background">
       <header className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 z-10">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLocation("/")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex flex-col">
-            <h1 className="text-sm font-bold leading-tight flex items-center gap-2">
-              {scenarioName}
-              {isTutorial && <span className="bg-primary/20 text-primary text-[9px] px-1.5 py-0.5 rounded uppercase">Tutorial</span>}
-            </h1>
-          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLocation("/")}><ArrowLeft className="h-4 w-4" /></Button>
+          <div className="flex flex-col"><h1 className="text-sm font-bold leading-tight flex items-center gap-2">{scenarioName}{isTutorial && <span className="bg-primary/20 text-primary text-[9px] px-1.5 py-0.5 rounded uppercase">Tutorial</span>}</h1></div>
         </div>
-        
         <div className="flex items-center gap-2">
-          {autosaveTime && (
-            <div className="text-[10px] text-muted-foreground flex items-center mr-2">
-              <Clock className="w-3 h-3 mr-1" />
-              Auto-saved {formatDistanceToNow(new Date(autosaveTime))} ago
-            </div>
-          )}
-          <Button
-            variant={developerPanelOpen ? "default" : "outline"}
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => setDeveloperPanelOpen((current) => !current)}
-          >
-            <Code2 className="h-3 w-3 mr-1.5" />
-            Developer AI
-          </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExport}>
-            <Download className="h-3 w-3 mr-1.5" />
-            Export
-          </Button>
-          {!isTutorial && (
-            <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Save className="h-3 w-3 mr-1.5" />}
-              Save
-            </Button>
-          )}
+          {autosaveTime && <div className="text-[10px] text-muted-foreground flex items-center mr-2"><Clock className="w-3 h-3 mr-1" />Auto-saved {formatDistanceToNow(new Date(autosaveTime))} ago</div>}
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setWorldSetupOpen(true)}><MapPin className="h-3 w-3 mr-1.5" />World</Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setLocation('/analytics')}><BarChart3 className="h-3 w-3 mr-1.5" />Analytics</Button>
+          <Button variant={developerPanelOpen ? "default" : "outline"} size="sm" className="h-8 text-xs" onClick={() => setDeveloperPanelOpen(current => !current)}><Code2 className="h-3 w-3 mr-1.5" />Developer AI</Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExport}><Download className="h-3 w-3 mr-1.5" />Export</Button>
+          {!isTutorial && <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>{updateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Save className="h-3 w-3 mr-1.5" />}Save</Button>}
         </div>
       </header>
 
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
-            <PaletteSidebar />
-          </ResizablePanel>
-          
+          <ResizablePanel defaultSize={15} minSize={10} maxSize={25}><PaletteSidebar /></ResizablePanel>
           <ResizableHandle withHandle />
-          
           <ResizablePanel defaultSize={60}>
             <ResizablePanelGroup direction="vertical">
               <ResizablePanel defaultSize={70}>
-                <CommandCanvas mapTemplateId={board.mapTemplateId} />
+                <div className="relative h-full w-full overflow-hidden">
+                  <WorldMapUnderlay />
+                  <div className="absolute inset-0 z-10"><CommandCanvas mapTemplateId={board.mapTemplateId} /></div>
+                </div>
               </ResizablePanel>
-              
               <ResizableHandle withHandle />
-              
-              <ResizablePanel defaultSize={30} minSize={15}>
-                <ScoringPanel />
-              </ResizablePanel>
+              <ResizablePanel defaultSize={30} minSize={15}><ScoringPanel /></ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
-          
           <ResizableHandle withHandle />
-          
           <ResizablePanel defaultSize={25} minSize={15} maxSize={35}>
             <ResizablePanelGroup direction="vertical">
-              <ResizablePanel defaultSize={50}>
-                <PropertiesSidebar />
-              </ResizablePanel>
+              <ResizablePanel defaultSize={50}><PropertiesSidebar /></ResizablePanel>
               <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={50}>
-                <AdvisorPanel />
-              </ResizablePanel>
+              <ResizablePanel defaultSize={50}><AdvisorPanel /></ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
 
       <DeveloperAiPanel open={developerPanelOpen} onClose={() => setDeveloperPanelOpen(false)} />
+      <WorldSetupPanel open={worldSetupOpen} onClose={() => setWorldSetupOpen(false)} />
     </div>
   );
 }
