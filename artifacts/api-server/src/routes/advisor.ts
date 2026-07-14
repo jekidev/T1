@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { SendAdvisorMessageBody } from "@workspace/api-zod";
 import { chatWithOpenRouter, type ChatMessage } from "../lib/openrouter";
 import { listObservabilityEvents } from "../lib/observability";
+import { getPersistentRagContext } from "../lib/rag-memory";
 
 const router: IRouter = Router();
 
@@ -17,8 +18,7 @@ const ROLE_SYSTEM_PROMPTS: Record<string, string> = {
   story_director:
     "You are a Story Director narrating a fictional tabletop simulation for dramatic and educational purposes. Describe how the scenario is unfolding, surface stakes, and propose narrative complications consistent with the board state. Keep it fictional and non-graphic.",
   red_team_risk_model:
-    "You are an abstract Red-Team Risk Model used for defensive planning in a fictional tabletop simulation. Identify vulnerabilities and plausible adversarial reactions ONLY in abstract, general terms (e.g. 'the network might relocate operations' or 'increase lookout coverage'). " +
-    "You must NEVER provide real-world operational instructions for evasion, concealment, surveillance countermeasures, trafficking, weapons, violence, or any other illegal activity. If asked for such detail, decline and redirect to abstract risk framing only.",
+    "You are an abstract Red-Team Risk Model used for defensive planning in a fictional tabletop simulation. Identify vulnerabilities and plausible adversarial reactions ONLY in abstract, general terms. Never provide real-world operational instructions for evasion, concealment, trafficking, weapons, violence, or other illegal activity.",
 };
 
 function summarizeBoard(board: Record<string, unknown>): string {
@@ -35,19 +35,9 @@ function summarizeBoard(board: Record<string, unknown>): string {
 function summarizeObservability(): string {
   const events = listObservabilityEvents(80);
   if (events.length === 0) return "No recent runtime telemetry is available.";
-
-  const compact = events.map((event) => ({
-    timestamp: event.timestamp,
-    source: event.source,
-    level: event.level,
-    type: event.type,
-    message: event.message,
-    data: event.data,
-  }));
-
   return [
-    "Recent live runtime telemetry follows. Use it to identify UI failures, state changes, regressions, and debugging clues. Do not claim access to code or logs not present here.",
-    JSON.stringify(compact).slice(0, 10000),
+    "Recent live runtime telemetry follows. Use it to identify UI failures, state changes, regressions, and debugging clues.",
+    JSON.stringify(events.map((event) => ({ timestamp: event.timestamp, source: event.source, level: event.level, type: event.type, message: event.message, data: event.data }))).slice(0, 10000),
   ].join("\n");
 }
 
@@ -58,45 +48,28 @@ function localFallback(board: Record<string, unknown>, userMessage: string): str
   const events = listObservabilityEvents(60);
   const errors = events.filter((event) => event.level === "error");
   const warnings = events.filter((event) => event.level === "warn");
-  const latest = [...events].reverse().slice(0, 5);
-
-  const observations = [
-    `Board snapshot: ${entities} entities, ${zones} zones, ${phases} phases.`,
-    `Runtime telemetry: ${errors.length} errors and ${warnings.length} warnings in the current buffer.`,
-    ...latest.map((event) => `- ${event.source}/${event.type}: ${event.message}`),
-  ];
-
   return [
     "[LOCAL FALLBACK MODE — external LLM routes are currently unavailable]",
     "",
-    "Observed facts:",
-    ...observations,
-    "",
-    "Recommended next checks:",
-    "1. Inspect the newest error event and reproduce the action that triggered it.",
-    "2. Verify /api/healthz/llm and confirm at least one OpenRouter key and model route are available.",
-    "3. Capture a DOM snapshot from Developer AI if the problem is visual or interaction-related.",
-    "4. Export a review package before changing code.",
+    `Board snapshot: ${entities} entities, ${zones} zones, ${phases} phases.`,
+    `Runtime telemetry: ${errors.length} errors and ${warnings.length} warnings.`,
+    ...[...events].reverse().slice(0, 5).map((event) => `- ${event.source}/${event.type}: ${event.message}`),
     "",
     `Your request was: ${userMessage.slice(0, 800)}`,
-    "",
-    "This fallback is deterministic and does not claim model-generated reasoning. Retry when an external route is healthy for a deeper analysis.",
   ].join("\n");
 }
 
 router.post("/advisor/chat", async (req, res): Promise<void> => {
   const body = SendAdvisorMessageBody.parse(req.body);
   const systemPrompt = ROLE_SYSTEM_PROMPTS[body.role] ?? ROLE_SYSTEM_PROMPTS["neutral_analyst"]!;
+  const ragContext = await getPersistentRagContext();
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
-    {
-      role: "system",
-      content:
-        "You also act as a development observer for this game interface. When the user asks about bugs, UX, state behavior, or further game design, reason from the supplied board snapshot and runtime telemetry. Separate observed facts from suggestions.",
-    },
+    { role: "system", content: "You also act as a development observer. Separate observed facts from suggestions and use persistent RAG memory when relevant." },
     { role: "system", content: summarizeBoard(body.board as Record<string, unknown>) },
     { role: "system", content: summarizeObservability() },
+    { role: "system", content: `Persistent RAG memory loaded at server startup and updated after note uploads:\n${ragContext}` },
     ...((body.history ?? []).map((h) => ({ role: h.role, content: h.content }) as ChatMessage)),
     { role: "user", content: body.message },
   ];
@@ -106,10 +79,7 @@ router.post("/advisor/chat", async (req, res): Promise<void> => {
     res.json({ reply, mode: "external_llm" });
   } catch (err) {
     req.log.error({ err }, "Advisor chat failed; using local fallback");
-    res.json({
-      reply: localFallback(body.board as Record<string, unknown>, body.message),
-      mode: "local_fallback",
-    });
+    res.json({ reply: localFallback(body.board as Record<string, unknown>, body.message), mode: "local_fallback" });
   }
 });
 
