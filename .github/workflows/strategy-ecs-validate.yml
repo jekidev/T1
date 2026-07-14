@@ -59,7 +59,7 @@ jobs:
             pnpm typecheck 2>&1 | tee /tmp/strategy-typecheck.log
             TYPECHECK_CODE=${PIPESTATUS[0]}
 
-            pnpm test:strategy 2>&1 | tee /tmp/strategy-test.log
+            pnpm test:integration 2>&1 | tee /tmp/strategy-test.log
             TEST_CODE=${PIPESTATUS[0]}
 
             pnpm build 2>&1 | tee /tmp/strategy-build.log
