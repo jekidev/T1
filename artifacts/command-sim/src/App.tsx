@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import ScenarioList from '@/pages/scenario-list';
 import BoardPage from '@/pages/board';
+import { installTelemetry } from '@/lib/telemetry';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
 const queryClient = new QueryClient();
@@ -19,6 +21,8 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => installTelemetry(), []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
