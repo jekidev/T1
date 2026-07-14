@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ObservabilityConsent } from '@/components/observability-consent';
 import NotFound from '@/pages/not-found';
 import ScenarioList from '@/pages/scenario-list';
 import BoardPage from '@/pages/board';
 import AnalyticsPage from '@/pages/analytics';
+import AssetLabPage from '@/pages/asset-lab';
 import { installTelemetry } from '@/lib/telemetry';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
@@ -17,6 +19,7 @@ function Router() {
       <Route path="/" component={ScenarioList} />
       <Route path="/board/:id" component={BoardPage} />
       <Route path="/analytics" component={AnalyticsPage} />
+      <Route path="/asset-lab" component={AssetLabPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -31,6 +34,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
           <Router />
         </WouterRouter>
+        <ObservabilityConsent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
