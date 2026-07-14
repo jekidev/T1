@@ -16,6 +16,7 @@
     "build:server": "pnpm --filter @workspace/api-server build",
     "start": "pnpm --filter @workspace/api-server start",
     "rag:sync": "node scripts/rag-sync.mjs",
+    "check:rag-preservation": "node scripts/check-rag-preservation.mjs",
     "local:setup": "pnpm setup",
     "local:run": "NODE_ENV=production pnpm build && pnpm start",
     "test:strategy": "pnpm --filter @workspace/strategy-sim test",
@@ -23,7 +24,7 @@
     "test:geo": "pnpm --filter @workspace/geo-world test",
     "test:coding-agent": "pnpm --filter @workspace/coding-agent test",
     "test:command-sim": "pnpm --filter @workspace/command-sim test",
-    "test:integration": "pnpm test:strategy && pnpm test:assets && pnpm test:geo && pnpm test:coding-agent && pnpm test:command-sim",
+    "test:integration": "pnpm check:rag-preservation && pnpm test:strategy && pnpm test:assets && pnpm test:geo && pnpm test:coding-agent && pnpm test:command-sim",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
