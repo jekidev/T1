@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 from pathlib import Path
 
 from openhands.sdk import Agent, Conversation, LLM, Tool
@@ -59,6 +60,17 @@ def main() -> None:
     conversation = Conversation(agent=agent, workspace=str(workspace))
     conversation.send_message(prompt_file.read_text(encoding="utf-8"))
     conversation.run()
+
+    intent = subprocess.run(
+        ["git", "add", "--intent-to-add", "--all"],
+        cwd=workspace,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if intent.returncode != 0:
+        raise SystemExit(f"Could not register new files for diff collection: {intent.stderr}")
 
 
 if __name__ == "__main__":
