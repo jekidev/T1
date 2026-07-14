@@ -4,13 +4,14 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "setup": "node scripts/setup.mjs",
     "dev": "pnpm --filter @workspace/api-server dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "build:frontend": "pnpm --filter @workspace/command-sim build",
     "build:server": "pnpm --filter @workspace/api-server build",
     "start": "pnpm --filter @workspace/api-server start",
     "rag:sync": "node scripts/rag-sync.mjs",
-    "local:setup": "pnpm install --frozen-lockfile && pnpm rag:sync",
+    "local:setup": "pnpm setup",
     "local:run": "NODE_ENV=production pnpm build && pnpm start",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
