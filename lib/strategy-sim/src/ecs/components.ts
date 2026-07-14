@@ -70,6 +70,14 @@ export interface UnitComponent {
   captureStrength: number;
 }
 
+export interface VisibilityComponent {
+  hidden: boolean;
+  detectableByAdjacentUnits: boolean;
+  providesVision: boolean;
+  visionRange?: number;
+  rememberWhenExplored: boolean;
+}
+
 export interface HealthComponent {
   current: number;
   maximum: number;
@@ -131,6 +139,7 @@ export interface StrategyEntity {
   influence?: InfluenceComponent;
   blackmail?: BlackmailComponent;
   unit?: UnitComponent;
+  visibility?: VisibilityComponent;
   health?: HealthComponent;
   movement?: MovementComponent;
   combat?: CombatComponent;
