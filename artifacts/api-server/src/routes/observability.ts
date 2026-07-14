@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import {
   listObservabilityEvents,
   recordObservabilityEvent,
@@ -88,7 +88,7 @@ router.post("/observability/replay/:sessionId", async (req, res): Promise<void> 
   }
 });
 
-router.get("/observability/replay", async (_req, res): Promise<void> => {
+router.get("/observability/replay", requireReplayAdmin, async (_req, res): Promise<void> => {
   try {
     res.json({ sessions: await sessionReplayStorage.list() });
   } catch (error) {
@@ -96,7 +96,7 @@ router.get("/observability/replay", async (_req, res): Promise<void> => {
   }
 });
 
-router.get("/observability/replay/:sessionId", async (req, res): Promise<void> => {
+router.get("/observability/replay/:sessionId", requireReplayAdmin, async (req, res): Promise<void> => {
   try {
     res.json({
       sessionId: req.params.sessionId,
@@ -106,6 +106,32 @@ router.get("/observability/replay/:sessionId", async (req, res): Promise<void> =
     res.status(404).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
+
+function requireReplayAdmin(req: Request, res: Response, next: () => void): void {
+  const expected = process.env.OBSERVABILITY_REPLAY_ADMIN_TOKEN;
+  if (!expected || expected.length < 24) {
+    res.status(503).json({ error: "Replay administration is disabled until OBSERVABILITY_REPLAY_ADMIN_TOKEN is configured." });
+    return;
+  }
+  const header = req.headers["x-observability-admin-token"];
+  const headerToken = Array.isArray(header) ? header[0] : header;
+  const authorization = req.headers.authorization;
+  const bearer = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!constantTimeEqual(expected, headerToken ?? bearer ?? "")) {
+    res.status(401).json({ error: "Invalid replay administrator credential." });
+    return;
+  }
+  next();
+}
+
+function constantTimeEqual(expected: string, supplied: string): boolean {
+  if (expected.length !== supplied.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ supplied.charCodeAt(index);
+  }
+  return mismatch === 0;
+}
 
 function redactTelemetryValue(value: unknown, depth = 0): unknown {
   if (depth > 8) return "[TRUNCATED]";
