@@ -1,10 +1,13 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import { request as httpsRequest, type IncomingHttpHeaders } from "node:https";
+import type { LookupFunction } from "node:net";
 import path from "node:path";
 import {
   NetworkApprovalRequiredError,
   requireNetworkAccess,
   type NetworkCapability,
+  type ResolvedPublicAddress,
 } from "./network-access";
 import { listRagMemory, syncRagIntoPersistentMemory } from "./rag-memory";
 
@@ -45,14 +48,10 @@ export async function importArtOfWar(input: {
     sha256: sha256(text),
     licenseNote: "Project Gutenberg distribution terms are included in the downloaded text. Verify local public-domain rules before redistribution.",
     immutability: "The source text is append-only. A changed upstream file is stored under a new content-addressed filename.",
+    networkVerification: "The approved hostname was resolved to public addresses and the HTTPS connection was pinned to one validated address.",
   }, null, 2));
   const sync = await syncRagIntoPersistentMemory();
-  return {
-    filePath: relative(file),
-    sourcePath: relative(source),
-    ragRevision: await calculateRagRevision(),
-    sync,
-  };
+  return { filePath: relative(file), sourcePath: relative(source), ragRevision: await calculateRagRevision(), sync };
 }
 
 export async function importHuggingFaceTextFiles(input: {
@@ -97,6 +96,7 @@ export async function importHuggingFaceTextFiles(input: {
       "No model weights, pickle files, binaries or executable artifacts",
       "Imported content is data for retrieval and is never executed",
       "Existing RAG source files are never overwritten, deleted, moved or renamed",
+      "Each origin and redirect is separately authorized and DNS-pinned to a validated public address",
     ],
   }, null, 2);
   const manifestHash = sha256(manifestBody).slice(0, 12);
@@ -128,51 +128,73 @@ async function fetchApprovedText(input: {
 }): Promise<string> {
   let currentUrl = input.url;
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
-    const authorization = await requireNetworkAccess({
+    const approval = await requireNetworkAccess({
       sessionId: input.network.sessionId,
       token: input.network.token,
       capability: input.capability,
       targetUrl: currentUrl,
       reason: redirect === 0 ? input.reason : `${input.reason} Follow validated redirect ${redirect}.`,
     });
-    const response = await fetch(authorization.url, {
-      method: "GET",
-      redirect: "manual",
-      headers: {
-        "accept": "text/plain, text/markdown, application/json, text/csv, application/yaml, text/yaml;q=0.9",
-        "user-agent": "T1-RAG-Importer/1.1",
-        ...(input.authorization ? { authorization: input.authorization } : {}),
-      },
-      signal: AbortSignal.timeout(45_000),
+    const response = await pinnedHttpsGet({
+      url: approval.url,
+      address: approval.resolvedAddresses[redirect % approval.resolvedAddresses.length]!,
+      maxBytes: input.maxBytes,
+      authorization: input.authorization,
     });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
+    if (response.statusCode >= 300 && response.statusCode < 400) {
+      const location = firstHeader(response.headers.location);
       if (!location) throw new Error("Remote source returned a redirect without a Location header.");
-      currentUrl = new URL(location, authorization.url).toString();
+      currentUrl = new URL(location, approval.url).toString();
       continue;
     }
-    if (!response.ok) throw new Error(`Remote text import failed with HTTP ${response.status}.`);
-    const contentLength = Number(response.headers.get("content-length") ?? 0);
-    if (contentLength > input.maxBytes) throw new Error(`Remote text file exceeds ${input.maxBytes} bytes.`);
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("Remote text response had no readable body.");
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    while (true) {
-      const result = await reader.read();
-      if (result.done) break;
-      total += result.value.byteLength;
-      if (total > input.maxBytes) {
-        await reader.cancel();
-        throw new Error(`Remote text file exceeds ${input.maxBytes} bytes.`);
-      }
-      chunks.push(result.value);
-    }
-    const buffer = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)));
-    if (buffer.includes(0)) throw new Error("Binary content is not allowed in RAG text imports.");
-    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+    if (response.statusCode < 200 || response.statusCode >= 300) throw new Error(`Remote text import failed with HTTP ${response.statusCode}.`);
+    if (response.body.includes(0)) throw new Error("Binary content is not allowed in RAG text imports.");
+    return new TextDecoder("utf-8", { fatal: true }).decode(response.body);
   }
   throw new Error("Remote source exceeded the maximum redirect count.");
+}
+
+function pinnedHttpsGet(input: {
+  url: URL;
+  address: ResolvedPublicAddress;
+  maxBytes: number;
+  authorization?: string;
+}): Promise<{ statusCode: number; headers: IncomingHttpHeaders; body: Buffer }> {
+  return new Promise((resolve, reject) => {
+    const pinnedLookup: LookupFunction = (_hostname, _options, callback) => callback(null, input.address.address, input.address.family);
+    const request = httpsRequest(input.url, {
+      method: "GET",
+      lookup: pinnedLookup,
+      servername: input.url.hostname,
+      headers: {
+        accept: "text/plain, text/markdown, application/json, text/csv, application/yaml, text/yaml;q=0.9",
+        "user-agent": "T1-RAG-Importer/1.2",
+        ...(input.authorization ? { authorization: input.authorization } : {}),
+      },
+    }, response => {
+      const contentLength = Number(firstHeader(response.headers["content-length"]) ?? 0);
+      if (contentLength > input.maxBytes) {
+        response.destroy(new Error(`Remote text file exceeds ${input.maxBytes} bytes.`));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let total = 0;
+      response.on("data", (chunk: Buffer | Uint8Array | string) => {
+        const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        total += bytes.length;
+        if (total > input.maxBytes) {
+          response.destroy(new Error(`Remote text file exceeds ${input.maxBytes} bytes.`));
+          return;
+        }
+        chunks.push(bytes);
+      });
+      response.on("end", () => resolve({ statusCode: response.statusCode ?? 0, headers: response.headers, body: Buffer.concat(chunks) }));
+      response.on("error", reject);
+    });
+    request.setTimeout(45_000, () => request.destroy(new Error("Remote text import timed out.")));
+    request.on("error", reject);
+    request.end();
+  });
 }
 
 export function isNetworkApprovalRequired(error: unknown): error is NetworkApprovalRequiredError {
@@ -251,6 +273,10 @@ function safeRepositoryFile(value: string): string {
   const extension = path.extname(normalized).toLowerCase();
   if (!SAFE_TEXT_EXTENSIONS.has(extension)) throw new Error(`Unsupported RAG import extension: ${extension || "none"}.`);
   return normalized.slice(0, 500);
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function sha256(value: string): string {
