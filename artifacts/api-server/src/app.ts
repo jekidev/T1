@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -30,5 +32,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+if (process.env.NODE_ENV === "production") {
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const frontendDir = path.resolve(currentDir, "../../command-sim/dist/public");
+
+  app.use(express.static(frontendDir));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+
+    res.sendFile(path.join(frontendDir, "index.html"));
+  });
+}
 
 export default app;
