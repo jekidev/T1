@@ -10,13 +10,22 @@ import {
 
 const router: IRouter = Router();
 const ModeSchema = z.enum(["ask_first", "ultra"]);
+const UltraApprovalSchema = z.object({
+  approvedBy: z.string().trim().min(1).max(240),
+  confirmation: z.literal("ENABLE ULTRA"),
+});
 
 router.post("/network/sessions", (req, res): void => {
-  const body = z.object({
-    mode: ModeSchema.default("ask_first"),
-    ttlMinutes: z.coerce.number().int().min(5).max(480).default(120),
-  }).parse(req.body ?? {});
-  res.status(201).json(createNetworkSession(body));
+  try {
+    const body = z.object({
+      mode: ModeSchema.default("ask_first"),
+      ttlMinutes: z.coerce.number().int().min(5).max(480).default(120),
+      ultraApproval: UltraApprovalSchema.optional(),
+    }).parse(req.body ?? {});
+    res.status(201).json(createNetworkSession(body));
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
 });
 
 router.get("/network/sessions/:id", (req, res): void => {
@@ -29,8 +38,18 @@ router.get("/network/sessions/:id", (req, res): void => {
 
 router.patch("/network/sessions/:id", (req, res): void => {
   try {
-    const body = z.object({ mode: ModeSchema }).parse(req.body);
-    res.json({ session: updateNetworkSession({ sessionId: req.params.id, token: networkToken(req), mode: body.mode }) });
+    const body = z.object({
+      mode: ModeSchema,
+      ultraApproval: UltraApprovalSchema.optional(),
+    }).parse(req.body);
+    res.json({
+      session: updateNetworkSession({
+        sessionId: req.params.id,
+        token: networkToken(req),
+        mode: body.mode,
+        ultraApproval: body.ultraApproval,
+      }),
+    });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
   }
