@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "urban-strategy-simulator",
+  "compatibility_date": "2026-07-14",
+  "assets": {
+    "directory": "./artifacts/command-sim/dist/public",
+    "not_found_handling": "single-page-application"
+  }
+}
