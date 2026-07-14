@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -28,6 +29,7 @@ def main() -> None:
     model = os.getenv("CODING_AGENT_AIDER_MODEL", "").strip()
     if not model:
         raise SystemExit("CODING_AGENT_AIDER_MODEL is required.")
+    enforce_model_network_mode(model)
 
     command = [
         "aider",
@@ -57,6 +59,22 @@ def main() -> None:
     )
     if intent.returncode != 0:
         raise SystemExit(f"Could not register new files for diff collection: {intent.stderr}")
+
+
+def enforce_model_network_mode(model: str) -> None:
+    normalized = model.lower()
+    browsing_model = (
+        normalized.endswith(":online")
+        or "/online" in normalized
+        or normalized.startswith("perplexity/")
+        or re.search(r"(?:^|/)sonar(?:-|$)", normalized) is not None
+        or re.search(r"search[-_ ]preview|web[-_ ]search|internet[-_ ]search|grounded[-_ ]search", normalized) is not None
+    )
+    if browsing_model and os.getenv("CODING_AGENT_NETWORK_MODE", "deny") != "ultra":
+        raise SystemExit(
+            "The selected Aider model has integrated web access. "
+            "It is forbidden in Ask First/deny mode; explicitly create an Ultra run or use a non-browsing model."
+        )
 
 
 if __name__ == "__main__":
