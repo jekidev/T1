@@ -18,6 +18,7 @@
     "rag:sync": "node scripts/rag-sync.mjs",
     "local:setup": "pnpm setup",
     "local:run": "NODE_ENV=production pnpm build && pnpm start",
+    "test:strategy": "pnpm --filter @workspace/strategy-sim test",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
