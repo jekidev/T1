@@ -8,13 +8,18 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system assetworker \
+    && useradd --system --gid assetworker --home-dir /app assetworker
 
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY worker.py ./worker.py
-RUN mkdir -p /work
+RUN mkdir -p /work \
+    && chown -R assetworker:assetworker /app /work
+
+USER assetworker
 
 EXPOSE 8080
 
