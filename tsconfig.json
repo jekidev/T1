@@ -17,6 +17,9 @@
     },
     {
       "path": "./lib/asset-pipeline"
+    },
+    {
+      "path": "./lib/geo-world"
     }
   ]
 }
