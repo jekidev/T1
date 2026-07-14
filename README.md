@@ -16,15 +16,6 @@ Run one setup command:
 pnpm setup
 ```
 
-The setup script:
-
-- verifies Node.js 22+
-- enables pnpm through Corepack when needed
-- creates `.env` from `.env.example`
-- creates required RAG folders
-- installs all dependencies
-- prints the next Google Drive connection step
-
 Then start development:
 
 ```bash
@@ -40,10 +31,11 @@ NODE_ENV=production pnpm start
 
 ## Main modules
 
-- `artifacts/command-sim` — React strategy board, map, tutorials, AI workspace and Asset Lab
-- `artifacts/api-server` — Express API, RAG, OpenRouter integration, asset jobs and observability
-- `lib/strategy-sim` — deterministic Miniplex strategy simulation and command validation
+- `artifacts/command-sim` — React strategy board, tutorials, AI workspace, Asset Lab and Geo World Lab
+- `artifacts/api-server` — Express API, RAG, OpenRouter, asset jobs, OSM world import and observability
+- `lib/strategy-sim` — deterministic Miniplex simulation, command validation and faction-filtered fog views
 - `lib/asset-pipeline` — asset jobs, provider catalog, metadata, validation and publication gates
+- `lib/geo-world` — WGS84/local coordinates, Overpass parsing, public/place-role separation, chunks, placement and fog utilities
 - `services/asset-worker` — provider-neutral authenticated GPU/Blender worker boundary
 
 Application routes:
@@ -51,9 +43,33 @@ Application routes:
 ```text
 /              saved games and AI New Game
 /board/:id     playable strategy board
-/asset-lab     image→3D, human and video→animation job management
+/asset-lab     image→3D, human and video→animation jobs
+/geo-lab       bounded OSM import, feature inspection and saved asset placement
 /analytics     simulation analytics
 ```
+
+## Geospatial world
+
+The editable world uses OpenStreetMap/Overpass as its initial public geometry and POI source. The server builds bounded queries from a fixed category allowlist; raw OverpassQL is not accepted from browsers or LLMs.
+
+Implemented flow:
+
+```text
+selected WGS84 bounds
+→ bounded Overpass import
+→ roads, buildings, land use and public POIs
+→ privacy-safe category mapping
+→ deterministic world chunks
+→ persistent region
+→ tactical vector preview
+→ validated, versioned asset placement
+```
+
+Public map categories and gameplay roles are separate. Residential names and address tags are stripped, and real residences cannot be assigned fictional `safehouse` or `stashhouse` roles.
+
+The project does not scrape or convert Google Earth photogrammetry into permanent assets. Google Places remains an optional server-side public-place adapter.
+
+See [`docs/GEO_WORLD.md`](docs/GEO_WORLD.md).
 
 ## AI asset generation
 
@@ -70,7 +86,7 @@ Architecture and worker details:
 - [`docs/ASSET_PIPELINE.md`](docs/ASSET_PIPELINE.md)
 - [`services/asset-worker/README.md`](services/asset-worker/README.md)
 
-A missing worker produces an explicit retryable job failure. It does not generate a placeholder asset. Assets with unverified or restricted licenses cannot enter the production manifest.
+A missing worker produces an explicit retryable job failure. It does not generate a placeholder asset. Assets with unverified or restricted licenses cannot enter the production manifest. License verification and publication require a separate server-side reviewer credential.
 
 ## Observability
 
@@ -83,9 +99,17 @@ OpenTelemetry is the common server instrumentation layer. Highlight is the prima
 
 See [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
-## Strategy simulation
+## Strategy simulation and fog of war
 
-The new strategy layer is headless and deterministic. React and future Three.js rendering consume simulation state but do not own it. Player, local-bot, behavior-tree and future LLM actions use the same validated command queue.
+The strategy layer is headless and deterministic. React and future Three.js rendering consume simulation state but do not own it. Player, local-bot, behavior-tree and future LLM actions use the same validated command queue.
+
+`exportFactionView` is the multiplayer-safe visibility boundary:
+
+- friendly and detected entities are returned live
+- enemy dynamic entities outside vision are omitted entirely
+- hidden entities can remain omitted inside ordinary vision
+- previously observed static objects may return only stale snapshots
+- pending commands and the full event log remain outside the faction view
 
 See:
 
@@ -101,7 +125,9 @@ pnpm test:integration
 pnpm build
 ```
 
-`test:integration` currently includes the deterministic strategy tests, blackmail/board bridge tests and asset-pipeline state/validation tests.
+`test:integration` includes deterministic strategy, blackmail, fog-of-war, board bridge, asset-pipeline and geospatial world tests.
+
+The feature branch currently changes workspace manifests without a regenerated `pnpm-lock.yaml`. GitHub workflows are also failing before useful step logs are available. Do not treat the branch as merge-ready until the lockfile is regenerated and typecheck/tests/build have completed successfully.
 
 ## Replit
 
@@ -109,23 +135,20 @@ pnpm build
 2. Run `pnpm setup`.
 3. Open Replit Connections and connect Google Drive.
 4. Add `OPENROUTER_API_KEY` through Replit Secrets.
-5. Ask Replit Agent to use the connected Google Drive account as the only RAG source and preserve the existing `pnpm rag:sync` flow.
+5. Add asset, Overpass and observability settings from `deployment/asset-pipeline.env.example` as needed.
+6. Ask Replit Agent to preserve the existing pnpm workspace and Google Drive-only RAG flow.
 
-Google OAuth credentials must remain in the Replit connection store and must never be committed to GitHub.
+Google OAuth credentials, API keys, worker tokens and reviewer tokens must remain in platform connection/secret stores and must never be committed to GitHub.
 
 ## Manus
 
 Give Manus this instruction:
 
 ```text
-Use https://github.com/jekidev/T1 as the canonical repository. Run pnpm setup first. Preserve the existing pnpm workspace, Express API, command-sim frontend, and Google Drive-only RAG flow. Use the Google Drive connection configured in Manus as the only external RAG source. Keep OAuth tokens and API keys in platform connections or secrets, never in GitHub.
+Use https://github.com/jekidev/T1 as the canonical repository. Run pnpm setup first. Preserve the pnpm workspace, Express API, command-sim frontend, Google Drive-only RAG flow, geospatial public-category/game-role boundary, server-authoritative fog views, and external GPU-worker architecture. Keep OAuth tokens and API keys in platform connections or secrets, never in GitHub.
 ```
 
 ## Google Drive RAG
-
-The repository supports Google Drive as the only external RAG source.
-
-When a platform connection is available, Replit or Manus should use that authenticated connection to read Drive files and pass them into the project ingestion flow.
 
 For local or Termux use, place downloaded Drive files in:
 
@@ -144,8 +167,6 @@ Then run:
 ```bash
 pnpm rag:sync
 ```
-
-The sync script copies supported documents into `rag/inbox`, removes duplicates by SHA-256, and writes `rag/inbox/manifest.json`.
 
 ## Local / Termux
 
