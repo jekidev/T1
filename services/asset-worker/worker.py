@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, AsyncIterator, Literal
 from urllib.parse import quote
 
 import httpx
@@ -116,7 +116,7 @@ async def execute_pipeline_step(request: WorkerRequest, operation: str) -> Worke
     notes: list[str] = []
     try:
         source_path = await download_source(request.source, input_dir) if request.source else None
-        artifact_paths = await download_artifacts(request.inputs, input_dir)
+        artifact_paths = await download_artifacts(effective_inputs(request), input_dir)
         primary_input = source_path or (artifact_paths[0] if artifact_paths else None)
 
         placeholders = build_placeholders(
@@ -164,6 +164,36 @@ async def execute_pipeline_step(request: WorkerRequest, operation: str) -> Worke
     finally:
         if os.getenv("ASSET_KEEP_WORKDIR", "false").lower() not in {"1", "true", "yes"}:
             shutil.rmtree(job_root, ignore_errors=True)
+
+
+def effective_inputs(request: WorkerRequest) -> list[InputArtifact]:
+    if request.inputs:
+        return request.inputs
+
+    artifacts = request.job.get("artifacts")
+    if not isinstance(artifacts, list):
+        return []
+
+    download_base = str(request.artifactUploadBaseUrl).rstrip("/")
+    inputs: list[InputArtifact] = []
+    for artifact in artifacts[:100]:
+        if not isinstance(artifact, dict):
+            continue
+        kind = artifact.get("kind")
+        mime_type = artifact.get("mimeType")
+        sha256 = artifact.get("sha256")
+        if not isinstance(kind, str) or not isinstance(mime_type, str) or not isinstance(sha256, str):
+            continue
+        try:
+            inputs.append(InputArtifact(
+                kind=kind,
+                mimeType=mime_type,
+                sha256=sha256,
+                downloadUrl=f"{download_base}/{quote(sha256, safe='')}",
+            ))
+        except ValueError:
+            continue
+    return inputs
 
 
 async def download_source(source: SourceReference, input_dir: Path) -> Path:
@@ -241,14 +271,26 @@ async def upload_artifact(request: WorkerRequest, path: Path, kind: str) -> None
     mime_type = mime_for_path(path)
     headers = {
         request.artifactUploadHeader: worker_token(),
-        "Content-Type": mime_type,
+        "Content-Type": "application/octet-stream",
+        "X-Artifact-Mime-Type": mime_type,
         "X-Artifact-SHA256": sha256_file(path),
     }
     timeout = httpx.Timeout(connect=30, read=600, write=600, pool=30)
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-        with path.open("rb") as handle:
-            response = await client.put(upload_url, headers=headers, content=handle.read())
+        response = await client.put(upload_url, headers=headers, content=stream_file(path))
         response.raise_for_status()
+
+
+async def stream_file(path: Path) -> AsyncIterator[bytes]:
+    handle = path.open("rb")
+    try:
+        while True:
+            chunk = await asyncio.to_thread(handle.read, 1024 * 1024)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        handle.close()
 
 
 def build_placeholders(
