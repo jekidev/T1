@@ -8,13 +8,14 @@ It supports:
 - Aider for focused patches
 - disposable Git worktrees
 - hard path allowlists
-- command/runtime limits
+- command and runtime limits
 - deterministic diff collection
 - test execution before publication
 - independent patch review
 - draft pull-request publication
-- stop/cancellation
-- Ask First, Offline and explicitly confirmed Ultra network modes
+- stop and cancellation
+- Ask First and explicitly confirmed Ultra network modes
+- schema-validated sandbox firewall audits
 
 The worker has no merge endpoint.
 
@@ -26,7 +27,8 @@ Use the included `docker-compose.yml`.
 - `network-gate` connects to `agent-internal` and `egress`.
 - The worker cannot reach the public internet directly.
 - Model calls, terminal HTTP clients and Git use authenticated proxy credentials.
-- Runtimes without proxy credentials fail closed.
+- Provider processes without proxy credentials fail closed.
+- Validation commands run without an egress credential.
 
 Do not attach `coding-agent-worker` directly to a normal egress-enabled network.
 
@@ -76,21 +78,24 @@ curl http://127.0.0.1:8787/health
 
 ### Ask First
 
-Default. Model API domains are available, while browsing is denied unless the run contains an explicit `network-domain:example.com` approval label. Denied domains are written to the shared policy volume for inspection.
+Ask First is the default. The API converts the task policy into one of two authorizations:
 
-### Offline
+- `deny`: no host/capability pair was approved
+- `allowlisted`: exact public DNS hosts and explicit capabilities were approved before execution
 
-Agent browsing is disabled. The provider bridge can still reach its configured model endpoint.
+Supported capabilities are `web_search`, `web_fetch`, `package_registry`, `source_docs` and `issue_tracker`. Wildcard hosts are rejected. Model-provider transport is isolated and is not considered browsing permission.
+
+Every attempted tool-egress request is recorded by `network-gate`. An allowed request outside the authorization causes deterministic patch rejection before review or publication.
 
 ### Ultra
 
-Requires `network-ultra-confirmed`. Public web access is permitted for that isolated run. Private, local, link-local and metadata addresses remain blocked.
+Ultra requires explicit `approvedBy` and `approvedAt` metadata from the administration UI. Public HTTPS tool traffic is permitted for that isolated run. Private, local, link-local, multicast and cloud-metadata addresses remain blocked. Ultra runs are high risk and require external plus human review.
 
 ## GitHub token scope
 
 Use a dedicated token or GitHub App installation with only the permissions required to:
 
-- clone/fetch the selected repository
+- clone and fetch the selected repository
 - push `agent/*` branches
 - create draft pull requests
 
@@ -100,11 +105,19 @@ Do not give it repository administration, Actions-secret, branch-protection or m
 
 `execute` may modify only the disposable worktree. It cannot push.
 
+`execute` must return:
+
+- patch
+- command results
+- test results
+- `AgentNetworkAudit` produced from firewall records
+
 `publish` is called only after:
 
-1. deterministic path/policy validation
-2. all reported tests pass
-3. independent review accepts the patch
-4. the current diff still matches the validated digest
+1. deterministic path and policy validation
+2. deterministic network-audit validation
+3. all reported tests pass
+4. independent review accepts the patch
+5. the current diff still matches the validated digest
 
 The worker then creates a commit, pushes the isolated branch and opens a draft PR. Human review and CI remain mandatory.
