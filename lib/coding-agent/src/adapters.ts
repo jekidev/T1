@@ -12,6 +12,8 @@ import {
   type CodingTaskResult,
   type PatchReviewInput,
   type PatchReviewResult,
+  type PublishPullRequestInput,
+  type PublishPullRequestResult,
   type RepositoryAnalysisInput,
   type RepositoryMap,
 } from "./types";
@@ -50,12 +52,14 @@ export class RemoteCodingAgentAdapter implements CodingAgentAdapter {
 
   async executeTask(input: CodingTaskExecutionInput): Promise<CodingTaskResult> {
     const response = await this.request("execute", input);
+    if (response.pullRequestUrl || response.branchPublished === true) {
+      throw new Error("Sandbox violated the protocol by publishing before deterministic patch validation.");
+    }
     return {
       patch: AgentPatchSchema.parse(response.patch),
       commands: Array.isArray(response.commands) ? response.commands.map(value => CommandResultSchema.parse(value)) : [],
       tests: Array.isArray(response.tests) ? response.tests.map(value => TestResultSchema.parse(value)) : [],
       ...(response.evaluation ? { evaluation: ChangeEvaluationSchema.parse(response.evaluation) } : {}),
-      ...(typeof response.pullRequestUrl === "string" ? { pullRequestUrl: response.pullRequestUrl } : {}),
     };
   }
 
@@ -70,11 +74,25 @@ export class RemoteCodingAgentAdapter implements CodingAgentAdapter {
     };
   }
 
+  async publishPullRequest(input: PublishPullRequestInput): Promise<PublishPullRequestResult> {
+    if (!input.run.policyDecision?.accepted || !input.run.patch || !input.run.plan) {
+      throw new Error("A validated plan, patch and accepted policy decision are required before publication.");
+    }
+    const response = await this.request("publish", input);
+    if (typeof response.pullRequestUrl !== "string" || typeof response.branchName !== "string") {
+      throw new Error("Sandbox publish response is missing branchName or pullRequestUrl.");
+    }
+    if (response.branchName !== input.run.branchName) {
+      throw new Error("Sandbox published an unexpected branch name.");
+    }
+    return { branchName: response.branchName, pullRequestUrl: new URL(response.pullRequestUrl).toString() };
+  }
+
   async stop(runId: string): Promise<void> {
     await this.request("stop", { runId });
   }
 
-  private async request(action: "analyze" | "plan" | "execute" | "review" | "stop", payload: unknown): Promise<Record<string, unknown>> {
+  private async request(action: "analyze" | "plan" | "execute" | "review" | "publish" | "stop", payload: unknown): Promise<Record<string, unknown>> {
     const url = new URL(`v1/adapters/${this.id}/${action}`, this.baseUrl);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
