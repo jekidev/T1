@@ -1,0 +1,16 @@
+{
+  "id": "example-dashboard-plugin",
+  "name": "Example Dashboard Plugin",
+  "version": "0.1.0",
+  "category": "dashboards",
+  "entryPoints": {
+    "frontend": "src/index.tsx",
+    "backend": null
+  },
+  "permissions": ["read:telemetry"],
+  "environmentVariables": [],
+  "compatibleGameVersion": ">=0.0.0",
+  "dependencies": ["analytics"],
+  "validation": ["pnpm typecheck", "pnpm build"],
+  "requiresApprovalForWrites": true
+}
