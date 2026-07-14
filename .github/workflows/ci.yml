@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Enable Corepack
         run: corepack enable
@@ -41,8 +43,17 @@ jobs:
             pnpm install --no-frozen-lockfile
           fi
 
-      - name: Validate asset worker syntax
-        run: python3 -m py_compile services/asset-worker/worker.py
+      - name: Validate Python worker syntax
+        run: |
+          python3 -m py_compile services/asset-worker/worker.py
+          python3 -m py_compile services/coding-agent-worker/worker.py
+          python3 -m py_compile services/coding-agent-worker/worker_v2.py
+          python3 -m py_compile services/coding-agent-worker/network_gate.py
+          python3 -m py_compile services/coding-agent-worker/providers/openhands_runner.py
+          python3 -m py_compile services/coding-agent-worker/providers/aider_runner.py
+
+      - name: Protect existing RAG files
+        run: pnpm check:rag-preservation
 
       - name: Typecheck
         run: pnpm typecheck
