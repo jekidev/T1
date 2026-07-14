@@ -1,4 +1,5 @@
 export * from "./StrategySimulation";
+export * from "./assessment/TeamAssessment";
 export * from "./blackmail/BlackmailService";
 export * from "./blackmail/BlackmailSystem";
 export * from "./blackmail/config";
@@ -10,6 +11,10 @@ export * from "./ecs/components";
 export * from "./ecs/entityFactory";
 export * from "./ecs/world";
 export * from "./events/EventLog";
+export * from "./npc/NpcMemory";
+export * from "./npc/NpcRoutineEngine";
+export * from "./npc/types";
 export * from "./scenarios/createHeadlessScenario";
+export * from "./status/CharacterStatus";
 export * from "./systems/types";
 export * from "./visibility/StrategyVisibility";
