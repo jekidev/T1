@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { SendAdvisorMessageBody } from "@workspace/api-zod";
 import { chatWithOpenRouter, type ChatMessage } from "../lib/openrouter";
+import { listObservabilityEvents } from "../lib/observability";
 
 const router: IRouter = Router();
 
@@ -31,13 +32,38 @@ function summarizeBoard(board: Record<string, unknown>): string {
   }
 }
 
+function summarizeObservability(): string {
+  const events = listObservabilityEvents(80);
+  if (events.length === 0) return "No recent runtime telemetry is available.";
+
+  const compact = events.map((event) => ({
+    timestamp: event.timestamp,
+    source: event.source,
+    level: event.level,
+    type: event.type,
+    message: event.message,
+    data: event.data,
+  }));
+
+  return [
+    "Recent live runtime telemetry follows. Use it to identify UI failures, state changes, regressions, and debugging clues. Do not claim access to code or logs not present here.",
+    JSON.stringify(compact).slice(0, 10000),
+  ].join("\n");
+}
+
 router.post("/advisor/chat", async (req, res): Promise<void> => {
   const body = SendAdvisorMessageBody.parse(req.body);
   const systemPrompt = ROLE_SYSTEM_PROMPTS[body.role] ?? ROLE_SYSTEM_PROMPTS["neutral_analyst"]!;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
+    {
+      role: "system",
+      content:
+        "You also act as a development observer for this game interface. When the user asks about bugs, UX, state behavior, or further game design, reason from the supplied board snapshot and runtime telemetry. Separate observed facts from suggestions.",
+    },
     { role: "system", content: summarizeBoard(body.board as Record<string, unknown>) },
+    { role: "system", content: summarizeObservability() },
     ...((body.history ?? []).map((h) => ({ role: h.role, content: h.content }) as ChatMessage)),
     { role: "user", content: body.message },
   ];
