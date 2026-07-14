@@ -13,6 +13,7 @@ This package owns:
 - economy and resource extraction
 - production and construction
 - territory capture
+- in-game blackmail, evidence and influence state
 - morale and entity cleanup
 - local rule-based AI fallback
 - event logs
@@ -55,6 +56,35 @@ simulation.submitCommand({
 })
 ```
 
+## In-game blackmail service
+
+The old global DOM module is not used. The integrated service submits ordinary validated commands and can be consumed by a later React panel.
+
+```ts
+const targets = simulation.blackmail.getTargets("faction-red")
+
+simulation.blackmail.gatherEvidence(
+  "faction-red",
+  "faction-blue",
+)
+
+simulation.blackmail.executeBlackmail(
+  "faction-red",
+  "faction-blue",
+  "isolation",
+)
+```
+
+Available approaches:
+
+- `fear` — temporarily disrupts target combat intent and reduces morale
+- `greed` — transfers available in-game treasury
+- `isolation` — reduces diplomatic relations and applies a temporary isolation state
+
+Evidence, reputation costs, operational-security loss, cooldowns, probability checks and effects are resolved during the fixed tick with `DeterministicRandom`. The subsystem never calls `Math.random()` and cannot mutate state outside the command pipeline.
+
+See `docs/BLACKMAIL_SYSTEM.md` for the full integration contract.
+
 ## Fixed stepping
 
 ```ts
@@ -71,7 +101,7 @@ simulation.step(100)
 pnpm test:strategy
 ```
 
-The headless suite includes two factions, 100 units, resource production, territory capture, combat, command rejection, local AI fallback, and save/load determinism.
+The headless suite includes two factions, 100 units, resource production, territory capture, combat, command rejection, local AI fallback, blackmail resolution, cooldown validation, and save/load determinism.
 
 ## Deferred systems
 
