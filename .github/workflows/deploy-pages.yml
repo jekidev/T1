@@ -20,14 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify integrated archive
-        run: test -f uploads/Urban-Strategy-Simulator-integrated.zip
-
-      - name: Extract project
-        run: |
-          mkdir project
-          unzip -q uploads/Urban-Strategy-Simulator-integrated.zip -d project
-
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -36,14 +28,12 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: project/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        working-directory: project
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
-        working-directory: project
         env:
           PORT: 4173
           BASE_PATH: /T1/
@@ -51,16 +41,17 @@ jobs:
 
       - name: Prepare Pages artifact
         run: |
-          cp project/artifacts/command-sim/dist/public/index.html project/artifacts/command-sim/dist/public/404.html
-          mkdir -p project/artifacts/command-sim/dist/public/rag
-          cp -R project/rag/HackerAI_documents project/artifacts/command-sim/dist/public/rag/
-          touch project/artifacts/command-sim/dist/public/.nojekyll
+          test -f artifacts/command-sim/dist/public/index.html
+          cp artifacts/command-sim/dist/public/index.html artifacts/command-sim/dist/public/404.html
+          mkdir -p artifacts/command-sim/dist/public/rag
+          cp -R rag/HackerAI_documents artifacts/command-sim/dist/public/rag/
+          touch artifacts/command-sim/dist/public/.nojekyll
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: project/artifacts/command-sim/dist/public
+          path: artifacts/command-sim/dist/public
 
   deploy:
     environment:
