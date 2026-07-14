@@ -9,6 +9,8 @@ import mcpRouter from "./mcp";
 import telegramAuthRouter from "./telegram-auth";
 import pathPlanningRouter from "./path-planning";
 import evolveRouter from "./evolve";
+import ragRouter from "./rag";
+import sourceDebugRouter from "./source-debug";
 
 const router: IRouter = Router();
 
@@ -21,6 +23,8 @@ router.use(mcpRouter);
 router.use(telegramAuthRouter);
 router.use(pathPlanningRouter);
 router.use(evolveRouter);
+router.use(ragRouter);
+router.use(sourceDebugRouter);
 router.use(advisorRouter);
 
 export default router;
