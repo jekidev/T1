@@ -1,0 +1,68 @@
+{
+  "caseId": "case-000",
+  "title": "Case title",
+  "realEvent": true,
+  "jurisdiction": "Denmark",
+  "dateRange": {
+    "start": null,
+    "end": null
+  },
+  "locations": [],
+  "status": "draft",
+  "sourceConfidence": "unknown",
+  "sources": [
+    {
+      "title": "Source title",
+      "publisher": "Publisher",
+      "publishedAt": null,
+      "url": null,
+      "sourceType": "court-record|authority|research|news|report|other",
+      "reliability": "high|medium|low|unknown",
+      "notes": ""
+    }
+  ],
+  "verifiedTimeline": [],
+  "verifiedFacts": [],
+  "disputedClaims": [],
+  "unknowns": [],
+  "actors": [],
+  "institutions": [],
+  "geography": [],
+  "publicOutcome": [],
+  "redTeamPatterns": [],
+  "blueTeamPatterns": [],
+  "systemDynamics": [],
+  "consequences": {
+    "legal": [],
+    "social": [],
+    "economic": [],
+    "organizational": [],
+    "personal": []
+  },
+  "gameplayTranslation": {
+    "scenarioType": "",
+    "factions": [],
+    "mapLayers": [],
+    "missions": [],
+    "events": [],
+    "items": [],
+    "shops": [],
+    "skills": [],
+    "aiBehaviors": [],
+    "evidenceMechanics": [],
+    "uncertaintyMechanics": [],
+    "balanceVariables": {}
+  },
+  "fictionalization": {
+    "enabled": true,
+    "renamedPeople": true,
+    "compositeCharacters": true,
+    "alternateOutcomesAllowed": true,
+    "notes": ""
+  },
+  "review": {
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "canonicalForGameplay": false
+  }
+}
