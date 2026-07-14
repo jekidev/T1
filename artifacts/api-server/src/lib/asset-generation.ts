@@ -29,6 +29,8 @@ const WorkerResultSchema = z.object({
   notes: z.array(z.string().max(1000)).max(50).optional(),
 });
 
+type WorkerRole = AssetGenerator | "blender";
+
 const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -87,7 +89,7 @@ export class AssetGenerationManager {
     const job = await this.storage.readJob(jobId);
     if (["published", "cancelled"].includes(job.status)) throw new Error(`Cannot add artifacts to ${job.status} job.`);
     const artifact = await this.storage.saveArtifact(jobId, kind, content, mimeType);
-    const next = {
+    const next: AssetJob = {
       ...job,
       updatedAt: new Date().toISOString(),
       artifacts: [...job.artifacts.filter(item => item.sha256 !== artifact.sha256), artifact],
@@ -138,7 +140,7 @@ export class AssetGenerationManager {
       optional: true,
       metadata: job.metadata,
       validation: job.validation,
-      publishedAt: published.completedAt,
+      ...(published.completedAt ? { publishedAt: published.completedAt } : {}),
     };
     await this.storage.publish(entry);
     await this.storage.writeJob(published);
@@ -162,6 +164,7 @@ export class AssetGenerationManager {
           logger.error({ error, assetJobId: id }, "Asset generation job crashed");
           try {
             const current = await this.storage.readJob(id);
+            if (current.status === "cancelled" || current.status === "published") continue;
             const failed = failAssetJob(current, {
               code: "pipeline.unhandled",
               message: error instanceof Error ? error.message : String(error),
@@ -195,10 +198,12 @@ export class AssetGenerationManager {
       job = await this.advance(job, "generating");
       const generationResult = await this.invokeWorker(generator, job, "generate");
       job = await this.storage.readJob(id);
+      if (job.status === "cancelled") return;
 
       job = await this.advance(job, "blender_processing");
       const blenderResult = await this.invokeBlender(job);
       job = await this.storage.readJob(id);
+      if (job.status === "cancelled") return;
 
       job = await this.advance(job, "validating_output");
       const metadata = this.buildMetadata(job, generator, generationResult, blenderResult);
@@ -218,14 +223,13 @@ export class AssetGenerationManager {
 
   private async validateInput(job: AssetJob): Promise<void> {
     if (job.request.kind === "human_character" && !job.request.faceSourceAssetId) return;
-    const sourceId = job.request.kind === "human_character"
-      ? job.request.faceSourceAssetId
-      : job.request.sourceAssetId;
+    const sourceId = sourceIdForRequest(job.request);
     if (!sourceId) throw new Error("Source asset is required.");
     const source = await this.storage.readSource(sourceId);
     const isImage = source.metadata.mimeType.startsWith("image/");
     const isVideo = source.metadata.mimeType.startsWith("video/");
     if (job.request.kind === "image_to_3d" && !isImage) throw new Error("Image-to-3D jobs require an image source.");
+    if (job.request.kind === "human_character" && !isImage) throw new Error("Face-assisted human jobs require an image source.");
     if (job.request.kind === "video_to_animation" && !isVideo) throw new Error("Video-to-animation jobs require a video source.");
     if (source.metadata.byteLength > maximumSourceBytes(job.request.kind)) throw new Error("Source asset exceeds the configured size limit.");
   }
@@ -253,19 +257,17 @@ export class AssetGenerationManager {
   private async invokeBlender(job: AssetJob): Promise<z.infer<typeof WorkerResultSchema>> {
     const endpoint = process.env.ASSET_BLENDER_WORKER_URL;
     if (!endpoint) throw new Error("ASSET_BLENDER_WORKER_URL is required for optimization, LOD, retargeting and GLB validation.");
-    return this.postWorker(endpoint, "process", job, "mpfb2");
+    return this.postWorker(endpoint, "process", job, "blender");
   }
 
   private async postWorker(
     endpoint: string,
     operation: string,
     job: AssetJob,
-    generator: AssetGenerator,
+    role: WorkerRole,
   ): Promise<z.infer<typeof WorkerResultSchema>> {
     const baseUrl = requirePublicBaseUrl();
-    const sourceId = job.request.kind === "human_character"
-      ? job.request.faceSourceAssetId
-      : job.request.sourceAssetId;
+    const sourceId = sourceIdForRequest(job.request);
     const token = requireWorkerToken();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), workerTimeoutMs());
@@ -279,7 +281,8 @@ export class AssetGenerationManager {
         body: JSON.stringify({
           schemaVersion: 1,
           job,
-          generator,
+          role,
+          generator: job.selectedGenerator,
           source: sourceId ? {
             id: sourceId,
             downloadUrl: `${baseUrl}/api/asset-generation/worker/sources/${encodeURIComponent(sourceId)}`,
@@ -289,7 +292,7 @@ export class AssetGenerationManager {
         }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`Worker ${generator} returned HTTP ${response.status}.`);
+      if (!response.ok) throw new Error(`Worker ${role} returned HTTP ${response.status}.`);
       return WorkerResultSchema.parse(await response.json());
     } finally {
       clearTimeout(timeout);
@@ -308,6 +311,10 @@ export class AssetGenerationManager {
       : job.request.kind === "video_to_animation"
         ? "animation"
         : job.request.assetType;
+    const skeletonId = job.request.kind === "human_character" || job.request.kind === "video_to_animation"
+      ? merged.skeletonId ?? job.request.skeletonId
+      : undefined;
+
     return GeneratedAssetMetadataSchema.parse({
       id: merged.id ?? `generated-${job.id}`,
       sourceType: job.request.kind === "video_to_animation" ? "video" : job.request.kind === "human_character" ? "procedural" : "image",
@@ -320,9 +327,7 @@ export class AssetGenerationManager {
       polygonCount: merged.polygonCount ?? 0,
       textureMemoryBytes: merged.textureMemoryBytes ?? 0,
       lodCount: merged.lodCount ?? 1,
-      ...(assetType === "character" || assetType === "animation"
-        ? { skeletonId: merged.skeletonId ?? job.request.skeletonId }
-        : {}),
+      ...(skeletonId ? { skeletonId } : {}),
       createdAt: new Date().toISOString(),
     });
   }
@@ -342,7 +347,7 @@ export class AssetGenerationManager {
       issues,
       checks: {
         ...metadataReport.checks,
-        gltf: metadata.assetType === "animation" ? metadataReport.checks.gltf : hasPrimary,
+        gltf: hasPrimary,
         ...(metadata.assetType === "animation" ? { animation: hasPrimary } : {}),
       },
     };
@@ -356,6 +361,11 @@ export class AssetGenerationManager {
 }
 
 export const assetGenerationManager = new AssetGenerationManager();
+
+function sourceIdForRequest(request: AssetJobRequest): string | undefined {
+  if (request.kind === "human_character") return request.faceSourceAssetId;
+  return request.sourceAssetId;
+}
 
 function workerEndpoint(generator: AssetGenerator): string | undefined {
   const envKey = `ASSET_WORKER_${generator.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_URL`;
