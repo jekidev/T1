@@ -7,6 +7,7 @@ import type {
   CodingTaskExecutionInput,
   CodingTaskInput,
   PatchReviewInput,
+  PublishPullRequestInput,
   RepositoryAnalysisInput,
   RepositoryMap,
 } from "./types";
@@ -33,11 +34,13 @@ const task: AgentTask = {
   requestedBy: "user",
   allowedPaths: ["lib/example/"],
   labels: [],
+  createPullRequest: true,
   limits: { maxIterations: 5, maxCommands: 20, maxFilesChanged: 5, maxPatchLines: 100, maxRuntimeMinutes: 10, maxModelTokens: 20000, maxCost: 5 },
 };
 
 class MockAdapter implements CodingAgentAdapter {
   readonly id = "aider" as const;
+  published = false;
   constructor(private readonly passing: boolean) {}
   async analyzeRepository(_input: RepositoryAnalysisInput) { return map; }
   async planTask(_input: CodingTaskInput) {
@@ -53,22 +56,30 @@ class MockAdapter implements CodingAgentAdapter {
   async reviewPatch(_input: PatchReviewInput) {
     return { decision: { accepted: true, risk: "low" as const, codes: [], reasons: [], requiresHumanReview: true, requiresExternalReviewer: false }, notes: [] };
   }
+  async publishPullRequest(input: PublishPullRequestInput) {
+    this.published = true;
+    return { branchName: input.run.branchName, pullRequestUrl: "https://github.com/example/repo/pull/1" };
+  }
   async stop(_runId: string) {}
 }
 
-void test("passing patches stop at human review instead of auto merge", async () => {
-  const manager = new CodingAgentRunManager([new MockAdapter(true)]);
+void test("passing patches publish a PR and stop at human review", async () => {
+  const adapter = new MockAdapter(true);
+  const manager = new CodingAgentRunManager([adapter]);
   const run = manager.createRun(task, map);
   const completed = await manager.executeRun(run.id, map);
   assert.equal(completed.status, "awaiting_review");
   assert.equal(completed.branchName, "agent/aider/add-test");
-  assert.equal(completed.pullRequestUrl, undefined);
+  assert.equal(completed.pullRequestUrl, "https://github.com/example/repo/pull/1");
+  assert.equal(adapter.published, true);
 });
 
-void test("failed tests reject the patch", async () => {
-  const manager = new CodingAgentRunManager([new MockAdapter(false)]);
+void test("failed tests reject the patch before publication", async () => {
+  const adapter = new MockAdapter(false);
+  const manager = new CodingAgentRunManager([adapter]);
   const run = manager.createRun(task, map);
   const completed = await manager.executeRun(run.id, map);
   assert.equal(completed.status, "rejected");
   assert.equal(completed.policyDecision?.accepted, false);
+  assert.equal(adapter.published, false);
 });
