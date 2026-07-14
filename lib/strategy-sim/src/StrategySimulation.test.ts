@@ -76,6 +76,22 @@ void test("save and load preserve deterministic continuation", () => {
   assert.equal(original.canonicalSnapshot(), restored.canonicalSnapshot());
 });
 
+void test("pause, single-step and fractional scheduled speed are deterministic", () => {
+  const simulation = createHeadlessScenario({ seed: 11, unitsPerFaction: 1 }).simulation;
+  simulation.setPaused(true);
+  assert.equal(simulation.runScheduledFrame(), 0);
+  assert.equal(simulation.clock.tick, 0);
+
+  simulation.step(1);
+  assert.equal(simulation.clock.tick, 1, "manual debugger stepping works while paused");
+
+  simulation.setPaused(false);
+  simulation.setSpeedMultiplier(0.5);
+  assert.equal(simulation.runScheduledFrame(), 0);
+  assert.equal(simulation.runScheduledFrame(), 1);
+  assert.equal(simulation.clock.tick, 2);
+});
+
 void test("local strategy fallback continues without an LLM provider", () => {
   const scenario = createHeadlessScenario({ seed: 777, unitsPerFaction: 50, enableLocalAI: true });
   scenario.simulation.step(45);
