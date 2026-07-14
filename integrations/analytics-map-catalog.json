@@ -1,0 +1,47 @@
+{
+  "purpose": "Approved upstream projects for future adapters and plugin integrations. Do not copy entire repositories into core.",
+  "projects": [
+    {
+      "name": "Grafana",
+      "repository": "grafana/grafana",
+      "use": "External operational dashboards and long-term telemetry visualization",
+      "integrationMode": "optional external service or dashboard adapter",
+      "status": "catalogued"
+    },
+    {
+      "name": "Apache ECharts",
+      "repository": "apache/echarts",
+      "use": "Interactive timelines, heatmaps, networks, sankey and realtime charts",
+      "integrationMode": "frontend chart plugin",
+      "status": "planned"
+    },
+    {
+      "name": "MapLibre GL JS",
+      "repository": "maplibre/maplibre-gl-js",
+      "use": "Advanced vector map layers and provider-neutral world rendering",
+      "integrationMode": "map provider plugin",
+      "status": "planned"
+    },
+    {
+      "name": "React Flow",
+      "repository": "xyflow/xyflow",
+      "use": "AI workflow, faction relation and mission graph editors",
+      "integrationMode": "editor plugin",
+      "status": "planned"
+    },
+    {
+      "name": "Dockview",
+      "repository": "mathuo/dockview",
+      "use": "IDE-style movable analytics and AI panels",
+      "integrationMode": "workspace layout plugin",
+      "status": "planned"
+    },
+    {
+      "name": "Tweakpane",
+      "repository": "cocopon/tweakpane",
+      "use": "Live simulation tuning and developer controls",
+      "integrationMode": "developer control plugin",
+      "status": "planned"
+    }
+  ]
+}
