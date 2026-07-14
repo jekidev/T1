@@ -7,6 +7,7 @@ import type { StrategyWorld } from "../ecs/world";
 export const SYSTEM_ORDER = [
   "commands",
   "local-strategy",
+  "npc-routines",
   "tactical-intent",
   "blackmail",
   "path-intent",
@@ -16,6 +17,7 @@ export const SYSTEM_ORDER = [
   "economy",
   "production-construction",
   "territory-visibility",
+  "character-status",
   "morale-cleanup",
   "finalize",
 ] as const;
