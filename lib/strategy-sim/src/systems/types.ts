@@ -1,6 +1,6 @@
 import type { DeterministicRandom } from "../core/DeterministicRandom";
 import type { SimulationClock } from "../core/SimulationClock";
-import type { CommandEnvelope } from "../commands/types";
+import type { CommandEnvelope, CommandValidationResult } from "../commands/types";
 import type { EventLog } from "../events/EventLog";
 import type { StrategyWorld } from "../ecs/world";
 
@@ -27,6 +27,8 @@ export interface SimulationSystemContext {
   random: DeterministicRandom;
   events: EventLog;
   readyCommands: readonly CommandEnvelope[];
+  submitCommand: (command: CommandEnvelope) => CommandValidationResult;
+  nextCommandId: (prefix: string) => string;
 }
 
 export interface SimulationSystem {
