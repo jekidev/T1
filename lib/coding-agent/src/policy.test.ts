@@ -26,6 +26,7 @@ function task(overrides: Partial<AgentTask> = {}): AgentTask {
     requestedBy: "user",
     allowedPaths: ["artifacts/command-sim/"],
     labels: [],
+    createPullRequest: true,
     limits: { maxIterations: 12, maxCommands: 80, maxFilesChanged: 40, maxPatchLines: 8000, maxRuntimeMinutes: 45, maxModelTokens: 250000, maxCost: 25 },
     ...overrides,
   };
