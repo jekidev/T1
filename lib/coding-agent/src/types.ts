@@ -35,6 +35,46 @@ export const AgentLimitsSchema = z.object({
   maxCost: z.number().finite().min(0).max(100_000).default(DEFAULT_AGENT_LIMITS.maxCost),
 });
 
+export const AgentNetworkModeSchema = z.enum(["ask_first", "ultra"]);
+export const AgentNetworkCapabilitySchema = z.enum(["web_search", "web_fetch", "package_registry", "source_docs", "issue_tracker"]);
+export const AgentNetworkPolicySchema = z.object({
+  mode: AgentNetworkModeSchema.default("ask_first"),
+  approvedHosts: z.array(z.string().min(1).max(253)).max(100).default([]),
+  approvedCapabilities: z.array(AgentNetworkCapabilitySchema).max(20).default([]),
+  approvedBy: z.string().min(1).max(240).optional(),
+  approvedAt: z.string().datetime().optional(),
+});
+
+export const AgentNetworkAuthorizationSchema = z.object({
+  mode: z.enum(["deny", "allowlisted", "ultra"]),
+  allowedHosts: z.array(z.string().min(1).max(253)).max(100),
+  allowedCapabilities: z.array(AgentNetworkCapabilitySchema).max(20),
+  requireHttps: z.literal(true),
+  blockPrivateNetworks: z.literal(true),
+  rejectRedirectsUntilRevalidated: z.literal(true),
+  auditRequired: z.literal(true),
+  expiresAt: z.string().datetime(),
+});
+
+export const AgentNetworkAccessRecordSchema = z.object({
+  at: z.string().datetime(),
+  capability: AgentNetworkCapabilitySchema,
+  method: z.enum(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]),
+  origin: z.string().url(),
+  path: z.string().min(1).max(1_000),
+  allowed: z.boolean(),
+  reason: z.string().min(1).max(2_000),
+});
+
+export const AgentNetworkAuditSchema = z.object({
+  mode: z.enum(["deny", "allowlisted", "ultra"]),
+  enforcement: z.literal("sandbox_firewall"),
+  requests: z.array(AgentNetworkAccessRecordSchema).max(10_000),
+  privateNetworkBlocked: z.boolean(),
+  metadataEndpointsBlocked: z.boolean(),
+  redirectsRevalidated: z.boolean(),
+});
+
 export const RepositoryFileSummarySchema = z.object({
   path: z.string().min(1).max(1_000),
   language: z.string().min(1).max(80).optional(),
@@ -170,6 +210,7 @@ export const AgentTaskSchema = z.object({
   allowedPaths: z.array(z.string().min(1).max(1_000)).min(1).max(1_000),
   labels: z.array(z.string().min(1).max(160)).max(100).default([]),
   createPullRequest: z.boolean().default(true),
+  networkPolicy: AgentNetworkPolicySchema.default({ mode: "ask_first", approvedHosts: [], approvedCapabilities: [] }),
   limits: AgentLimitsSchema.default(DEFAULT_AGENT_LIMITS),
 });
 
@@ -188,6 +229,7 @@ export const AgentRunSchema = z.object({
   commands: z.array(CommandResultSchema).max(10_000).default([]),
   tests: z.array(TestResultSchema).max(10_000).default([]),
   evaluation: ChangeEvaluationSchema.optional(),
+  networkAudit: AgentNetworkAuditSchema.optional(),
   pullRequestUrl: z.string().url().optional(),
   error: z.object({ code: z.string().min(1).max(160), message: z.string().min(1).max(10_000) }).optional(),
   auditEvents: z.array(z.object({
@@ -199,6 +241,12 @@ export const AgentRunSchema = z.object({
 
 export type CodingAgentId = z.infer<typeof CodingAgentIdSchema>;
 export type AgentLimits = z.infer<typeof AgentLimitsSchema>;
+export type AgentNetworkMode = z.infer<typeof AgentNetworkModeSchema>;
+export type AgentNetworkCapability = z.infer<typeof AgentNetworkCapabilitySchema>;
+export type AgentNetworkPolicy = z.infer<typeof AgentNetworkPolicySchema>;
+export type AgentNetworkAuthorization = z.infer<typeof AgentNetworkAuthorizationSchema>;
+export type AgentNetworkAccessRecord = z.infer<typeof AgentNetworkAccessRecordSchema>;
+export type AgentNetworkAudit = z.infer<typeof AgentNetworkAuditSchema>;
 export type RepositoryFileSummary = z.infer<typeof RepositoryFileSummarySchema>;
 export type RepositoryModule = z.infer<typeof RepositoryModuleSchema>;
 export type DependencyRecord = z.infer<typeof DependencyRecordSchema>;
@@ -230,6 +278,7 @@ export interface CodingTaskExecutionInput {
   run: AgentRun;
   repositoryMap: RepositoryMap;
   plan: CodingTaskPlan;
+  networkAuthorization: AgentNetworkAuthorization;
 }
 
 export interface CodingTaskResult {
@@ -237,6 +286,7 @@ export interface CodingTaskResult {
   commands: CommandResult[];
   tests: TestResult[];
   evaluation?: ChangeEvaluation;
+  networkAudit: AgentNetworkAudit;
 }
 
 export interface PatchReviewInput {
