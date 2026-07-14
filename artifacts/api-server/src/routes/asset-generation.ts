@@ -119,11 +119,7 @@ router.post("/asset-generation/jobs/:id/publish", async (req, res): Promise<void
 
 router.get("/asset-generation/jobs/:id/artifacts/:sha", async (req, res): Promise<void> => {
   try {
-    const { artifact, content } = await assetGenerationManager.storage.readArtifact(req.params.id, req.params.sha);
-    res.setHeader("Content-Type", artifact.mimeType);
-    res.setHeader("Content-Length", String(content.byteLength));
-    res.setHeader("Cache-Control", "private, max-age=300");
-    res.send(content);
+    await sendArtifact(req.params.id, req.params.sha, res, "private, max-age=300");
   } catch (error) {
     sendError(res, error, 404);
   }
@@ -143,11 +139,24 @@ router.get("/asset-generation/worker/sources/:id", requireWorker, async (req, re
     res.setHeader("Content-Type", metadata.mimeType);
     res.setHeader("Content-Length", String(content.byteLength));
     res.setHeader("X-Content-SHA256", metadata.sha256);
+    res.setHeader("Cache-Control", "private, no-store");
     res.send(content);
   } catch (error) {
     sendError(res, error, 404);
   }
 });
+
+router.get(
+  "/asset-generation/worker/jobs/:id/artifacts/:sha",
+  requireWorker,
+  async (req, res): Promise<void> => {
+    try {
+      await sendArtifact(req.params.id, req.params.sha, res, "private, no-store");
+    } catch (error) {
+      sendError(res, error, 404);
+    }
+  },
+);
 
 router.put(
   "/asset-generation/worker/jobs/:id/artifacts/:kind",
@@ -160,7 +169,8 @@ router.put(
         return;
       }
       const kind = ArtifactKindSchema.parse(req.params.kind);
-      const mimeType = normalizeMimeType(req.headers["content-type"]) ?? "application/octet-stream";
+      const declaredMimeType = firstHeader(req, "x-artifact-mime-type");
+      const mimeType = normalizeMimeType(declaredMimeType ?? req.headers["content-type"]) ?? "application/octet-stream";
       const job = await withSpan("asset.artifact.upload", {
         "asset.job.id": req.params.id,
         "asset.artifact.kind": kind,
@@ -174,6 +184,15 @@ router.put(
     }
   },
 );
+
+async function sendArtifact(jobId: string, sha: string, res: Response, cacheControl: string): Promise<void> {
+  const { artifact, content } = await assetGenerationManager.storage.readArtifact(jobId, sha);
+  res.setHeader("Content-Type", artifact.mimeType);
+  res.setHeader("Content-Length", String(content.byteLength));
+  res.setHeader("X-Content-SHA256", artifact.sha256);
+  res.setHeader("Cache-Control", cacheControl);
+  res.send(content);
+}
 
 function requireWorker(req: Request, res: Response, next: () => void): void {
   const headerToken = firstHeader(req, "x-asset-worker-token");
