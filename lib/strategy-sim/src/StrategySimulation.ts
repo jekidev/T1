@@ -19,6 +19,11 @@ import { MovementSystem } from "./systems/MovementSystem";
 import { ProductionSystem } from "./systems/ProductionSystem";
 import { TerritorySystem } from "./systems/TerritorySystem";
 import { SYSTEM_ORDER, type SimulationSystem, type SimulationSystemContext, type SystemId } from "./systems/types";
+import {
+  buildFactionView,
+  type StrategyFactionView,
+  type StrategyVisibilityMemory,
+} from "./visibility/StrategyVisibility";
 
 export interface StrategySimulationOptions {
   seed?: number;
@@ -173,6 +178,16 @@ export class StrategySimulation {
       submittedCommands: this.submittedCommands.map(command => structuredClone(command)),
       eventLog: this.events.exportState(),
     };
+  }
+
+  exportFactionView(factionId: string, previousMemory: StrategyVisibilityMemory = {}): StrategyFactionView {
+    if (!factionId.trim()) throw new Error("factionId is required for a filtered simulation view.");
+    return buildFactionView({
+      factionId,
+      tick: this.clock.tick,
+      entities: this.world.allSorted(),
+      previousMemory,
+    });
   }
 
   importSnapshot(snapshot: StrategySimulationSnapshot): void {
