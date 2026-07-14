@@ -8,6 +8,7 @@ export const SYSTEM_ORDER = [
   "commands",
   "local-strategy",
   "tactical-intent",
+  "blackmail",
   "path-intent",
   "movement",
   "collision-avoidance",
