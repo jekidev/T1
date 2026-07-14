@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { z } from "zod";
 import {
   GeoBoundsSchema,
@@ -120,7 +120,7 @@ router.post("/mcp/tools/generate_world_region", async (req, res): Promise<void> 
   }
 });
 
-function sendError(res: Parameters<IRouter["use"]>[0] extends never ? never : import("express").Response, error: unknown, status: number): void {
+function sendError(res: Response, error: unknown, status: number): void {
   if (error instanceof z.ZodError) {
     res.status(400).json({
       error: "Validation failed.",
