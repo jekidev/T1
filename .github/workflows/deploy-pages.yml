@@ -20,24 +20,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.13.1 --activate
+          node --version
+          pnpm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
         env:
-          PORT: 4173
           BASE_PATH: /T1/
         run: pnpm --filter @workspace/command-sim build
 
@@ -49,11 +51,13 @@ jobs:
           cp -R rag/HackerAI_documents artifacts/command-sim/dist/public/rag/
           touch artifacts/command-sim/dist/public/.nojekyll
 
-      - uses: actions/configure-pages@v5
+      - name: Configure Pages
         if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: artifacts/command-sim/dist/public
 
