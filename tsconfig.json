@@ -14,6 +14,9 @@
     },
     {
       "path": "./lib/strategy-sim"
+    },
+    {
+      "path": "./lib/asset-pipeline"
     }
   ]
 }
