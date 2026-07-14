@@ -9,6 +9,7 @@ import BoardPage from '@/pages/board';
 import AnalyticsPage from '@/pages/analytics';
 import AssetLabPage from '@/pages/asset-lab';
 import GeoLabPage from '@/pages/geo-lab';
+import CodingAgentPage from '@/pages/coding-agent';
 import { installTelemetry } from '@/lib/telemetry';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/analytics" component={AnalyticsPage} />
       <Route path="/asset-lab" component={AssetLabPage} />
       <Route path="/geo-lab" component={GeoLabPage} />
+      <Route path="/coding-agent" component={CodingAgentPage} />
       <Route component={NotFound} />
     </Switch>
   );
