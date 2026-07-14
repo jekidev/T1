@@ -1,4 +1,10 @@
 import { nanoid } from "nanoid";
+import {
+  applySyndicateCommand,
+  createSyndicateWorld,
+  type SyndicateWorldState,
+  type Territory,
+} from "@workspace/strategy-sim";
 import type {
   BoardEntity,
   BoardState,
@@ -141,6 +147,93 @@ function compileSkills(payload: GeneratedGamePayload): SkillState[] {
   return payload.skills.map(skill => ({ id: `skill-${nanoid(8)}`, name: skill.name, level: 1, experience: 0, description: skill.description }));
 }
 
+function compileTerritories(board: BoardState, world: BoardWorldState): Territory[] {
+  if (board.zones.length > 0) {
+    return board.zones.map((zone, index) => ({
+      id: `territory-${zone.id}`,
+      name: zone.name,
+      bounds: zone.geoBounds
+        ? {
+            type: "Polygon",
+            coordinates: [[
+              [zone.geoBounds.west, zone.geoBounds.south],
+              [zone.geoBounds.east, zone.geoBounds.south],
+              [zone.geoBounds.east, zone.geoBounds.north],
+              [zone.geoBounds.west, zone.geoBounds.north],
+              [zone.geoBounds.west, zone.geoBounds.south],
+            ]],
+          }
+        : { type: "Polygon", coordinates: [[[zone.x, zone.y], [zone.x + zone.width, zone.y], [zone.x + zone.width, zone.y + zone.height], [zone.x, zone.y + zone.height], [zone.x, zone.y]]] },
+      influenceByFaction: {},
+      population: 20_000 + index * 3_000,
+      prosperity: 45 + (index % 5) * 8,
+      stability: 55 + (index % 4) * 7,
+      visibility: "unknown",
+      locationIds: board.entities.filter(entity => entity.zoneId === zone.id).map(entity => entity.id),
+      resourceModifiers: { capital: 1, supplies: 1, workforce: 1, intelligence: 1, influence: 1 },
+      loyaltyByFaction: {},
+      eventPressure: 10,
+      lastChangedAtTick: 0,
+    }));
+  }
+  const delta = Math.max(0.01, world.workAreaRadiusKm / 111);
+  return [{
+    id: `territory-${slug(world.city)}`,
+    name: `${world.city} Region`,
+    bounds: {
+      type: "Polygon",
+      coordinates: [[
+        [world.longitude - delta, world.latitude - delta],
+        [world.longitude + delta, world.latitude - delta],
+        [world.longitude + delta, world.latitude + delta],
+        [world.longitude - delta, world.latitude + delta],
+        [world.longitude - delta, world.latitude - delta],
+      ]],
+    },
+    influenceByFaction: {},
+    population: 100_000,
+    prosperity: 60,
+    stability: 65,
+    visibility: "rumored",
+    locationIds: board.entities.map(entity => entity.id),
+    resourceModifiers: { capital: 1, supplies: 1, workforce: 1, intelligence: 1, influence: 1 },
+    loyaltyByFaction: {},
+    eventPressure: 8,
+    lastChangedAtTick: 0,
+  }];
+}
+
+function compileSyndicateWorld(
+  board: BoardState,
+  payload: GeneratedGamePayload,
+  world: BoardWorldState,
+  factions: FactionState[],
+  seed: number,
+): SyndicateWorldState {
+  let syndicateWorld = createSyndicateWorld(seed, compileTerritories(board, world));
+  const criminalFactions = factions.filter(faction => faction.faction === "criminal");
+  for (const [index, faction] of criminalFactions.entries()) {
+    syndicateWorld = applySyndicateCommand(syndicateWorld, {
+      type: "create_syndicate",
+      commandId: `compile-syndicate-${index}-${faction.id}`,
+      tick: 0,
+      syndicateId: `syndicate-${slug(faction.id)}`,
+      name: faction.name,
+      leaderNpcId: `npc-leader-${slug(faction.name)}`,
+    });
+  }
+  syndicateWorld.sourceCases = payload.sourceCases.map((title, index) => ({
+    id: `source-case-${index}-${slug(title)}`,
+    title,
+    institution: "Source institution pending verification",
+    jurisdiction: world.country,
+    verified: false,
+    patternTags: ["real-case-inspired", "fictionalized-characters"],
+    fictionalizationRule: "Use only source-backed structural patterns. Replace all private people, personal data and operational details with fictional game entities.",
+  }));
+  return syndicateWorld;
+}
+
 export function compileGeneratedScenario(args: {
   board: BoardState;
   payload: GeneratedGamePayload;
@@ -160,8 +253,10 @@ export function compileGeneratedScenario(args: {
     rawModelOutput,
     validationWarnings,
   };
+  const seed = Math.abs([...premise].reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) | 0, 17));
+  const factions = compileFactions(payload);
   const simulationBase: SimulationState = {
-    seed: Math.abs([...premise].reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) | 0, 17)),
+    seed,
     turn: 0,
     day: 1,
     hour: 8,
@@ -171,9 +266,10 @@ export function compileGeneratedScenario(args: {
     evidenceQuality: 10,
     cityTension: 20,
     economyIndex: 100,
-    factions: compileFactions(payload),
+    factions,
     shops: compileShops(payload, world),
     skills: compileSkills(payload),
+    syndicateWorld: compileSyndicateWorld(board, payload, world, factions, seed),
     lastResolution: "New Game compiled successfully.",
   };
   const simulation: SimulationState = {
@@ -183,7 +279,7 @@ export function compileGeneratedScenario(args: {
 
   return {
     ...board,
-    version: 4,
+    version: 5,
     world,
     generatedContent,
     simulation,
@@ -204,11 +300,15 @@ export function compileGeneratedScenario(args: {
         id: nanoid(10),
         phaseId: "phase-onboarding",
         label: "AI world compiled",
-        description: `${payload.openingMission} (${payload.factions.length} factions, ${payload.assets.length} assets, ${simulation.shops.length} shops). Player spectrum ${simulation.teamDynamics?.userProfile.initialSpectrum ?? 50}/100.`,
+        description: `${payload.openingMission} (${payload.factions.length} factions, ${payload.assets.length} assets, ${simulation.shops.length} shops, ${simulation.syndicateWorld?.syndicates.length ?? 0} syndicates). Player spectrum ${simulation.teamDynamics?.userProfile.initialSpectrum ?? 50}/100.`,
         severity: "info",
         createdAt: new Date().toISOString(),
         sourceStatus: "fictional",
       },
     ],
   };
+}
+
+function slug(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "item";
 }
