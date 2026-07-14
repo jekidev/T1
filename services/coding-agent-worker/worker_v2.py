@@ -15,6 +15,7 @@ import secrets
 import threading
 import time
 import urllib.parse
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -144,8 +145,6 @@ def provider_environment(provider: str) -> dict[str, str]:
 
 
 def validation_environment() -> dict[str, str]:
-    # Validation commands receive no network-gate credential. Because the worker is
-    # on an internal-only network, package downloads and telemetry fail closed.
     environment = sanitized_environment()
     environment.update({
         "NO_PROXY": "*",
@@ -207,7 +206,7 @@ def validate_authorization(value: dict[str, Any]) -> dict[str, Any]:
             raise base.WorkerError(f"Network authorization requires {required}=true.")
     expires_at = str(value.get("expiresAt", ""))
     try:
-        expires_epoch = time.mktime(time.strptime(expires_at.replace(".000Z", "Z"), "%Y-%m-%dT%H:%M:%SZ"))
+        expires_epoch = datetime.fromisoformat(expires_at.replace("Z", "+00:00")).timestamp()
     except ValueError as error:
         raise base.WorkerError("Network authorization has an invalid expiresAt timestamp.") from error
     if expires_epoch <= time.time():
@@ -248,7 +247,7 @@ def collect_network_audit(run_id: str, authorization: dict[str, Any]) -> dict[st
                 continue
             if not isinstance(value, dict):
                 continue
-            request = {
+            requests.append({
                 "at": str(value.get("at", "")),
                 "capability": str(value.get("capability", "web_fetch")),
                 "method": str(value.get("method", "GET")),
@@ -256,8 +255,7 @@ def collect_network_audit(run_id: str, authorization: dict[str, Any]) -> dict[st
                 "path": str(value.get("path", "/")),
                 "allowed": bool(value.get("allowed", False)),
                 "reason": str(value.get("reason", "firewall decision")),
-            }
-            requests.append(request)
+            })
     return {
         "mode": authorization["mode"],
         "enforcement": "sandbox_firewall",
@@ -271,10 +269,9 @@ def collect_network_audit(run_id: str, authorization: dict[str, Any]) -> dict[st
 def clear_run_network_records(run_id: str) -> None:
     prefix = f"{base.safe_id(run_id)}-"
     for root in (AUDIT_ROOT, PENDING_ROOT):
-        if not root.is_dir():
-            continue
-        for path in root.glob(f"{prefix}*.json"):
-            path.unlink(missing_ok=True)
+        if root.is_dir():
+            for path in root.glob(f"{prefix}*.json"):
+                path.unlink(missing_ok=True)
 
 
 def model_domains() -> list[str]:
