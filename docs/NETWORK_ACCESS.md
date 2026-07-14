@@ -68,9 +68,17 @@ issue_tracker
 
 ## Ultra
 
-Ultra is never the default. It requires explicit confirmation, `approvedBy` and `approvedAt` for the temporary session or run.
+Ultra is never the default. Application network sessions require the exact interactive confirmation phrase:
 
-Ultra permits public HTTPS retrieval without prompting for each origin during that session. It does **not** permit:
+```text
+ENABLE ULTRA
+```
+
+The server also requires and records `approvedBy` and `approvedAt`. Possession of an LLM prompt, AI profile or agent tool is not sufficient to enable Ultra. The browser installs one global permission guard, so all current and future UI components pass through the same explicit confirmation boundary.
+
+Coding-agent Ultra runs separately require `approvedBy` and `approvedAt` in the immutable run request.
+
+Ultra permits public HTTPS retrieval without prompting for each origin during that temporary session or isolated run. It does **not** permit:
 
 - private, local, link-local or multicast networks
 - cloud metadata endpoints
@@ -84,6 +92,21 @@ Ultra permits public HTTPS retrieval without prompting for each origin during th
 - automatic merge
 
 Ultra coding-agent runs are high risk and require external plus human review.
+
+## Model-provider search guard
+
+Model inference traffic and internet retrieval are different authorities.
+
+The API server rejects chat-completion requests that attempt to use:
+
+- `:online` or `/online` model routing
+- Perplexity/Sonar browsing models
+- model identifiers advertising search-preview, web-search or grounded-search behavior
+- provider-specific browser, URL-fetch or web-search tools
+
+This prevents a normal chat model from hiding browsing inside the provider request. Normal advisor chat always remains non-browsing, including while an Ultra import session exists.
+
+Coding-agent provider runners apply the same model-name check. Integrated browsing models are rejected in Ask First or deny mode. They are allowed only for an explicitly created Ultra coding-agent run; ordinary tool retrieval still passes through the audited proxy.
 
 ## Server-side retrieval controls
 
