@@ -15,6 +15,8 @@ export class StrategyWorld {
     resourceNodes: this.ecs.with("identity", "transform", "resourceNode"),
     morale: this.ecs.with("identity", "morale", "health"),
     aiControlled: this.ecs.with("identity", "ai"),
+    npcs: this.ecs.with("identity", "npc"),
+    characterStatuses: this.ecs.with("identity", "characterStatus"),
   };
 
   add(entity: StrategyEntity): StrategyEntity {
