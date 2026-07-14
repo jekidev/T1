@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useGetScenario,
   useGetTutorialScenario,
@@ -14,8 +14,9 @@ import { PaletteSidebar } from "./sidebar-left";
 import { PropertiesSidebar } from "./sidebar-right";
 import { ScoringPanel } from "./scoring-panel";
 import { AdvisorPanel } from "./advisor-panel";
+import { DeveloperAiPanel } from "./developer-ai-panel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, Upload, Clock, Loader2, Play } from "lucide-react";
+import { ArrowLeft, Save, Download, Clock, Loader2, Code2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
@@ -37,23 +38,20 @@ export default function BoardPage() {
   
   const updateMutation = useUpdateScenario();
   
-  const { loadBoard, board, scenarioName, scenarioDescription, restoreAutosave } = useBoardStore();
+  const { loadBoard, board, scenarioName } = useBoardStore();
   
   const [initializedId, setInitializedId] = useState<string | null>(null);
   const [autosaveTime, setAutosaveTime] = useState<string | null>(readAutosaveTimestamp());
+  const [developerPanelOpen, setDeveloperPanelOpen] = useState(false);
 
-  // Init board
   useEffect(() => {
     const data = isTutorial ? tutorialQuery.data : scenarioQuery.data;
     if (data && initializedId !== id) {
-      // Check autosave first? For simplicity, we just load server state here.
-      // Autosave can be restored manually via a banner.
       loadBoard(data.board as any, data.id, data.name, data.description || "");
       setInitializedId(id!);
     }
   }, [scenarioQuery.data, tutorialQuery.data, id, initializedId, isTutorial, loadBoard]);
 
-  // Periodic autosave check
   useEffect(() => {
     const interval = setInterval(() => {
       setAutosaveTime(readAutosaveTimestamp());
@@ -74,7 +72,7 @@ export default function BoardPage() {
         }
       });
       toast({ title: "Scenario saved successfully." });
-    } catch(err) {
+    } catch {
       toast({ title: "Failed to save", variant: "destructive" });
     }
   };
@@ -91,7 +89,6 @@ export default function BoardPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Wait for load
   if ((!isTutorial && scenarioQuery.isLoading) || (isTutorial && tutorialQuery.isLoading)) {
     return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="animate-spin text-primary" /></div>;
   }
@@ -107,7 +104,6 @@ export default function BoardPage() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-background">
-      {/* Top Bar */}
       <header className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 z-10">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLocation("/")}>
@@ -128,6 +124,15 @@ export default function BoardPage() {
               Auto-saved {formatDistanceToNow(new Date(autosaveTime))} ago
             </div>
           )}
+          <Button
+            variant={developerPanelOpen ? "default" : "outline"}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setDeveloperPanelOpen((current) => !current)}
+          >
+            <Code2 className="h-3 w-3 mr-1.5" />
+            Developer AI
+          </Button>
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExport}>
             <Download className="h-3 w-3 mr-1.5" />
             Export
@@ -141,7 +146,6 @@ export default function BoardPage() {
         </div>
       </header>
 
-      {/* Main Workspace */}
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
           <ResizablePanel defaultSize={15} minSize={10} maxSize={25}>
@@ -179,6 +183,8 @@ export default function BoardPage() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      <DeveloperAiPanel open={developerPanelOpen} onClose={() => setDeveloperPanelOpen(false)} />
     </div>
   );
 }
