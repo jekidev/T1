@@ -3,7 +3,7 @@ import { useBoardStore } from '@/lib/game';
 type TelemetryLevel = 'debug' | 'info' | 'warn' | 'error';
 type TelemetrySource = 'browser' | 'game';
 
-interface TelemetryInput {
+export interface TelemetryInput {
   source: TelemetrySource;
   level: TelemetryLevel;
   type: string;
@@ -29,7 +29,7 @@ function flush() {
   if (queue.length === 0) return;
   const batch = queue.splice(0, 50);
 
-  void fetch('/api/observability/events', {
+  void window.fetch('/api/observability/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(batch),
@@ -48,12 +48,55 @@ export function trackTelemetry(event: TelemetryInput) {
   if (flushTimer === null) flushTimer = window.setTimeout(flush, 750);
 }
 
+function sanitizeElement(element: Element, depth = 0): unknown {
+  if (depth > 4) return undefined;
+  const attributes = Array.from(element.attributes)
+    .filter((attribute) => !['value', 'data-token', 'data-secret'].includes(attribute.name.toLowerCase()))
+    .slice(0, 12)
+    .reduce<Record<string, string>>((result, attribute) => {
+      result[attribute.name] = attribute.value.slice(0, 200);
+      return result;
+    }, {});
+
+  return {
+    tag: element.tagName.toLowerCase(),
+    id: element.id || undefined,
+    className: typeof element.className === 'string' ? element.className.slice(0, 300) : undefined,
+    role: element.getAttribute('role') ?? undefined,
+    ariaLabel: element.getAttribute('aria-label') ?? undefined,
+    text: element.children.length === 0 ? (element.textContent ?? '').trim().slice(0, 300) : undefined,
+    attributes,
+    children: Array.from(element.children).slice(0, 20).map((child) => sanitizeElement(child, depth + 1)),
+  };
+}
+
+export function captureDomSnapshot() {
+  const snapshot = {
+    path: window.location.pathname,
+    title: document.title,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    activeElement: document.activeElement ? sanitizeElement(document.activeElement) : undefined,
+    body: sanitizeElement(document.body),
+  };
+
+  trackTelemetry({
+    source: 'browser',
+    level: 'info',
+    type: 'dom.snapshot',
+    message: 'Sanitized DOM snapshot captured',
+    data: snapshot,
+  });
+
+  return snapshot;
+}
+
 export function installTelemetry() {
   if (installed || typeof window === 'undefined') return () => undefined;
   installed = true;
 
   const originalWarn = console.warn.bind(console);
   const originalError = console.error.bind(console);
+  const originalFetch = window.fetch.bind(window);
 
   console.warn = (...args: unknown[]) => {
     originalWarn(...args);
@@ -63,6 +106,38 @@ export function installTelemetry() {
   console.error = (...args: unknown[]) => {
     originalError(...args);
     trackTelemetry({ source: 'browser', level: 'error', type: 'console.error', message: String(args[0] ?? 'Error'), data: args.slice(1) });
+  };
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const startedAt = performance.now();
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
+    const isTelemetryTransport = url.includes('/api/observability/events');
+
+    try {
+      const response = await originalFetch(input, init);
+      if (!isTelemetryTransport) {
+        trackTelemetry({
+          source: 'browser',
+          level: response.status >= 500 ? 'error' : response.status >= 400 ? 'warn' : 'info',
+          type: 'network.request.completed',
+          message: `${method} ${url} -> ${response.status}`,
+          data: { method, url, status: response.status, durationMs: Math.round((performance.now() - startedAt) * 10) / 10 },
+        });
+      }
+      return response;
+    } catch (error) {
+      if (!isTelemetryTransport) {
+        trackTelemetry({
+          source: 'browser',
+          level: 'error',
+          type: 'network.request.failed',
+          message: `${method} ${url} failed`,
+          data: { error: error instanceof Error ? error.message : String(error), durationMs: Math.round((performance.now() - startedAt) * 10) / 10 },
+        });
+      }
+      throw error;
+    }
   };
 
   const onError = (event: ErrorEvent) => {
@@ -125,6 +200,7 @@ export function installTelemetry() {
     window.removeEventListener('unhandledrejection', onUnhandledRejection);
     console.warn = originalWarn;
     console.error = originalError;
+    window.fetch = originalFetch;
     installed = false;
   };
 }
