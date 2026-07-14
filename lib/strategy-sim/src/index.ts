@@ -16,5 +16,8 @@ export * from "./npc/NpcRoutineEngine";
 export * from "./npc/types";
 export * from "./scenarios/createHeadlessScenario";
 export * from "./status/CharacterStatus";
+export * from "./syndicate/commands";
+export * from "./syndicate/SyndicateSystem";
+export * from "./syndicate/types";
 export * from "./systems/types";
 export * from "./visibility/StrategyVisibility";
