@@ -10,7 +10,7 @@ export interface AiMemory {
 export interface McpServerDefinition {
   id: string;
   name: string;
-  transport: 'platform-connection' | 'http' | 'stdio';
+  transport: 'platform-connection' | 'http' | 'stdio' | 'internal';
   endpoint?: string;
   enabled: boolean;
   capabilities: string[];
@@ -36,6 +36,19 @@ export interface AiWorkspaceProfile {
 const STORAGE_KEY = 'urban-strategy-ai-workspace-profiles-v1';
 const ACTIVE_KEY = 'urban-strategy-ai-workspace-active-v1';
 
+const DEFAULT_MCP_SERVERS: McpServerDefinition[] = [
+  { id: 'memory', name: 'Memory MCP', transport: 'internal', enabled: true, capabilities: ['memory.list', 'memory.create', 'memory.update', 'memory.delete'], requiresApprovalForWrites: true },
+  { id: 'filesystem', name: 'Filesystem MCP', transport: 'internal', enabled: true, capabilities: ['filesystem.list', 'filesystem.read'], requiresApprovalForWrites: false },
+  { id: 'github', name: 'GitHub MCP', transport: 'http', endpoint: 'https://api.githubcopilot.com/mcp/', enabled: false, capabilities: ['repository.read', 'code.search', 'issues.read', 'pull_requests.read', 'propose_patch'], requiresApprovalForWrites: true },
+  { id: 'google-drive', name: 'Google Drive', transport: 'platform-connection', enabled: false, capabilities: ['search_documents', 'read_documents'], requiresApprovalForWrites: true },
+  { id: 'huggingface', name: 'Hugging Face Hub MCP', transport: 'http', endpoint: 'https://huggingface.co/mcp', enabled: false, capabilities: ['hub.search', 'models.read', 'datasets.read', 'spaces.read'], requiresApprovalForWrites: true },
+  { id: 'google-maps', name: 'Google Maps MCP', transport: 'http', enabled: false, capabilities: ['maps.geocode', 'maps.places', 'maps.routes', 'maps.distance_matrix'], requiresApprovalForWrites: false },
+  { id: 'playwright', name: 'Playwright MCP', transport: 'stdio', enabled: false, capabilities: ['browser.navigate', 'browser.inspect', 'browser.screenshot', 'browser.interact'], requiresApprovalForWrites: true },
+  { id: 'telegram-auth', name: 'Telegram Auth API', transport: 'http', enabled: false, capabilities: ['telegram.auth.start', 'telegram.auth.verify', 'telegram.auth.status', 'telegram.auth.logout'], requiresApprovalForWrites: true },
+  { id: 'telegram', name: 'Telegram MCP', transport: 'stdio', enabled: false, capabilities: ['telegram.chats.read', 'telegram.messages.read', 'telegram.search', 'telegram.messages.send', 'telegram.messages.edit', 'telegram.messages.delete', 'telegram.messages.forward', 'telegram.groups.manage'], requiresApprovalForWrites: true },
+  { id: 'rsshub', name: 'RSSHub', transport: 'http', enabled: false, capabilities: ['rss.fetch', 'rss.search'], requiresApprovalForWrites: false },
+];
+
 export const DEFAULT_AI_PROFILE: AiWorkspaceProfile = {
   id: 'game-co-designer',
   name: 'Game Co-Designer',
@@ -56,8 +69,9 @@ export const DEFAULT_AI_PROFILE: AiWorkspaceProfile = {
     'Never claim a code change was applied without a confirmed tool result.',
     'Do not expose or store credentials.',
     'Do not execute untrusted integration scripts.',
+    'Any MCP write or modify operation requires explicit approval.',
   ],
-  skills: ['gameplay-analysis', 'debugging', 'ux-review', 'balance-review', 'feature-planning'],
+  skills: ['gameplay-analysis', 'debugging', 'ux-review', 'balance-review', 'feature-planning', 'path-planning', 'evolution-audit'],
   memories: [
     {
       id: 'project-purpose',
@@ -66,35 +80,26 @@ export const DEFAULT_AI_PROFILE: AiWorkspaceProfile = {
       enabled: true,
     },
   ],
-  mcpServers: [
-    {
-      id: 'github',
-      name: 'GitHub',
-      transport: 'platform-connection',
-      enabled: false,
-      capabilities: ['read_repository', 'propose_patch', 'create_branch', 'open_pull_request'],
-      requiresApprovalForWrites: true,
-    },
-    {
-      id: 'google-drive',
-      name: 'Google Drive',
-      transport: 'platform-connection',
-      enabled: false,
-      capabilities: ['search_documents', 'read_documents'],
-      requiresApprovalForWrites: true,
-    },
-  ],
+  mcpServers: DEFAULT_MCP_SERVERS,
 };
 
 function cloneProfile(profile: AiWorkspaceProfile): AiWorkspaceProfile {
   return JSON.parse(JSON.stringify(profile)) as AiWorkspaceProfile;
 }
 
+function mergeMcpDefaults(profile: AiWorkspaceProfile): AiWorkspaceProfile {
+  const existing = new Map(profile.mcpServers.map(server => [server.id, server]));
+  return {
+    ...profile,
+    mcpServers: DEFAULT_MCP_SERVERS.map(server => ({ ...server, ...(existing.get(server.id) ?? {}) })),
+  };
+}
+
 export function loadAiProfiles(): AiWorkspaceProfile[] {
   if (typeof window === 'undefined') return [cloneProfile(DEFAULT_AI_PROFILE)];
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as AiWorkspaceProfile[];
-    return stored.length > 0 ? stored : [cloneProfile(DEFAULT_AI_PROFILE)];
+    return stored.length > 0 ? stored.map(mergeMcpDefaults) : [cloneProfile(DEFAULT_AI_PROFILE)];
   } catch {
     return [cloneProfile(DEFAULT_AI_PROFILE)];
   }
