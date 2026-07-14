@@ -45,10 +45,12 @@ export class CodingAgentRunManager {
   createRun(taskInput: AgentTask, repositoryMapInput: RepositoryMap): AgentRun {
     const task = AgentTaskSchema.parse(taskInput);
     const repositoryMap = RepositoryMapSchema.parse(repositoryMapInput);
+    const runId = `agent-run-${task.id}`;
+    if (this.runs.has(runId)) throw new Error(`Coding-agent run already exists: ${runId}`);
     const policyDecision = evaluateTaskPolicy(task, repositoryMap);
     const now = new Date().toISOString();
     const run: AgentRun = AgentRunSchema.parse({
-      id: `agent-run-${task.id}`,
+      id: runId,
       task,
       adapterId: task.requestedAdapter,
       status: policyDecision.accepted ? "created" : "rejected",
@@ -74,7 +76,7 @@ export class CodingAgentRunManager {
 
   async executeRun(runId: string, repositoryMapInput: RepositoryMap): Promise<AgentRun> {
     let run = this.getMutableRun(runId);
-    if (["cancelled", "completed", "rejected"].includes(run.status)) throw new Error(`Run cannot execute from status ${run.status}.`);
+    if (["cancelled", "completed", "rejected", "awaiting_review"].includes(run.status)) throw new Error(`Run cannot execute from status ${run.status}.`);
     const repositoryMap = RepositoryMapSchema.parse(repositoryMapInput);
     if (run.baseCommit !== repositoryMap.baseCommit) throw new Error("Repository map base commit changed; create a new run or rebase before execution.");
     const adapter = this.adapters.get(run.adapterId);
@@ -151,7 +153,7 @@ export class CodingAgentRunManager {
 
   async stopRun(runId: string): Promise<AgentRun> {
     const run = this.getMutableRun(runId);
-    if (["completed", "rejected", "failed", "cancelled"].includes(run.status)) return structuredClone(run);
+    if (["completed", "rejected", "failed", "cancelled", "awaiting_review"].includes(run.status)) return structuredClone(run);
     const adapter = this.adapters.get(run.adapterId);
     if (adapter) await adapter.stop(run.id);
     const cancelled = this.updateRun(run.id, { status: "cancelled" });
