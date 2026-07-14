@@ -1,0 +1,25 @@
+{
+  "packageName": "example-feature-package",
+  "version": "0.1.0",
+  "submittedAt": "2026-07-14T00:00:00Z",
+  "source": "Google Drive, local upload, Replit, Manus, or another documented source",
+  "status": "incoming",
+  "trustedSource": false,
+  "executeAutomatically": false,
+  "targetFeatures": ["game-core"],
+  "files": [
+    {
+      "path": "incoming/scripts/example.ts",
+      "type": "script",
+      "sha256": "",
+      "purpose": "Describe the intended integration"
+    }
+  ],
+  "requirements": [],
+  "risks": [],
+  "result": {
+    "branch": "",
+    "commit": "",
+    "notes": ""
+  }
+}
