@@ -8,106 +8,68 @@ The project is self-editing through Git, not self-overwriting in the active runt
 concrete improvement signal
 → repository map
 → deterministic task policy
-→ agent/{adapter}/{task-id} branch
+→ agent/{adapter}/{task-id}
 → isolated worktree or container
-→ patch
-→ secret and policy validation
-→ tests and build
-→ before/after evaluation
-→ pull request
+→ patch and test results
+→ deterministic validation
+→ independent adapter review
+→ publish agent branch and pull request
 → human review
 → merge or reject
 ```
 
-The API server cannot execute local shell commands for coding-agent tasks and has no endpoint that merges a pull request. OpenHands and Aider run behind a separately deployed authenticated sandbox bridge.
+The API server cannot run coding-agent shell commands locally, write to the default branch or merge a pull request. OpenHands and Aider run behind separately deployed authenticated sandbox bridges.
 
-## Current OpenHands integration model
+## OpenHands and Aider roles
 
-The current `OpenHands/OpenHands` repository is the Agent Canvas control center. Its README states that the agent and agent-server source moved to `OpenHands/software-agent-sdk`, while Agent Canvas moved to `OpenHands/agent-canvas`.
+The current `OpenHands/OpenHands` repository is the Agent Canvas control center. The agent/server implementation has moved to `OpenHands/software-agent-sdk`. `OpenHandsAdapter` therefore targets a project-owned Agent Server or ACP bridge rather than hard-coding an obsolete CLI.
 
-The project therefore does not hard-code an obsolete OpenHands CLI. `OpenHandsAdapter` targets a project-owned bridge that can connect to:
+`AiderAdapter` targets an isolated Aider CLI bridge for focused Git edits. Both adapters use the same task, branch, policy, test and review contracts.
 
-- an OpenHands Agent Server
-- an ACP-compatible OpenHands backend
-- an isolated OpenHands container or VM
-
-The bridge must convert the common project contract into the version-specific OpenHands API.
-
-## Aider integration model
-
-`AiderAdapter` uses the same bridge contract. The external bridge may run Aider inside an isolated worktree/container for focused edits, tests and Git commits.
-
-Aider does not receive a different permission model. It uses the same:
-
-- protected paths
-- task allowlist
-- patch limits
-- secret scanner
-- test requirements
-- human review requirement
-- branch convention
-
-## Domain package
-
-`lib/coding-agent` contains the provider-independent layer:
+## Project modules
 
 ```text
-src/
-├── types.ts
-├── policy.ts
-├── repositoryMap.ts
-├── patchValidator.ts
-├── adapters.ts
-└── runManager.ts
+lib/coding-agent/
+├── src/types.ts
+├── src/policy.ts
+├── src/repositoryMap.ts
+├── src/patchValidator.ts
+├── src/adapters.ts
+└── src/runManager.ts
+
+artifacts/api-server/src/
+├── lib/coding-agent-repository.ts
+├── lib/coding-agent-storage.ts
+├── lib/coding-agent-service.ts
+└── routes/coding-agent.ts
+
+artifacts/command-sim/src/pages/coding-agent/
+└── index.tsx
 ```
 
-It implements:
+The domain package implements:
 
-- `CodingAgentAdapter`
+- provider-independent `CodingAgentAdapter`
 - OpenHands and Aider adapters
-- task/run schemas
+- task, plan, patch, command, test and evaluation schemas
 - repository maps
-- branch naming
-- protected-path policy
-- self-modification policy
+- isolated branch naming
+- protected paths and self-modification policy
 - patch and secret validation
-- execution limits
-- tests/build result validation
-- before/after evaluation records
-- audit events
-- stop/cancel handling
+- run limits and lifecycle
+- independent reviewer decisions
+- delayed PR publication
+- audit events and cancellation
 
 ## Repository map
 
-The API creates a bounded metadata map from the current checkout.
+The API builds a bounded metadata map from the current checkout. It includes paths, sizes, languages, modules, package manifests, dependency names, entry points, test/build commands, protected paths and CODEOWNERS rules.
 
-It includes:
+It does not send the entire repository source to a model. The scanner skips `.git`, dependencies, build output, runtime data, virtual environments, symlinks and cached RAG inboxes. DeepSeek/RAG content is not read into the repository map.
 
-- paths
-- file sizes
-- language classification
-- module boundaries
-- package manifests and dependency names
-- entry points
-- test/build commands
-- protected paths
-- CODEOWNERS rules
+The external worker may fetch source content only for task-relevant files inside `allowedPaths`.
 
-It does not send the entire repository source to a model. Source content is fetched by the external worker only for task-relevant allowlisted files.
-
-The scanner skips:
-
-- `.git`
-- `node_modules`
-- generated build output
-- runtime data
-- virtual environments
-- cached RAG inboxes
-- symlinks
-
-Protected file contents are not included in the map.
-
-## Protected paths
+## Protected areas
 
 Default protected areas include:
 
@@ -130,40 +92,27 @@ agent-policies/
 audit/
 ```
 
-A task that requests a protected path is rejected before agent execution.
-
-Coding-agent self-modification paths require:
-
-- `self-modification` label
-- external reviewer
-- human review
-- no automatic merge
-
-The policy validator cannot be modified in the same patch as unrelated functional code.
+Self-modification under `lib/coding-agent/` requires a `self-modification` label, external reviewer and human review. The policy validator cannot be changed in the same patch as unrelated functionality.
 
 ## Patch validation
 
 The deterministic validator rejects or escalates:
 
-- paths outside the task allowlist
+- files outside the task allowlist
 - protected paths
 - base-commit mismatch
-- excessive file or line counts
+- excessive files or lines
 - binary patches
-- private keys
-- JWT-like credentials
-- GitHub tokens
-- API keys
-- generic hard-coded secrets
-- new `eval()` or `new Function()` usage
+- private keys, JWTs, tokens and hard-coded credentials
+- `eval()` and `new Function()` additions
 - remote download-to-shell commands
 - security bypasses
 - disabled tests
-- removal of tests without replacements
-- removal of audit or observability code
+- removed tests without replacements
+- removed audit/observability code
 - mixed policy and functional changes
 
-A remote reviewer cannot override a deterministic rejection.
+The remote reviewer can reject an otherwise valid patch. It cannot override a deterministic rejection.
 
 ## Run lifecycle
 
@@ -173,55 +122,116 @@ created
 → planned
 → executing
 → validating
-→ awaiting_review | rejected | failed | cancelled
+→ publishing
+→ awaiting_review
 ```
 
-A patch can reach `awaiting_review` only when:
+Alternative terminal states are:
 
-- deterministic policy accepts it
-- adapter review accepts it
-- at least one test result is present
-- every supplied test passed with exit code 0
-- before/after evaluation did not reject it
+```text
+rejected | failed | cancelled | completed
+```
 
-`awaiting_review` is intentionally terminal for the application. Merge happens outside the game through GitHub review.
+A patch reaches `publishing` only when:
+
+- deterministic policy accepted it
+- the independent adapter review accepted it
+- at least one test result exists
+- all reported tests passed with exit code 0
+- the before/after evaluation did not reject it
+- the task requested pull-request creation
+
+`awaiting_review` is terminal for the application. GitHub review controls merge.
+
+## Strict sandbox protocol
+
+The bridge API is staged deliberately.
+
+```text
+POST /v1/adapters/{openhands|aider}/analyze
+POST /v1/adapters/{openhands|aider}/plan
+POST /v1/adapters/{openhands|aider}/execute
+POST /v1/adapters/{openhands|aider}/review
+POST /v1/adapters/{openhands|aider}/publish
+POST /v1/adapters/{openhands|aider}/stop
+```
+
+All calls use:
+
+```http
+Authorization: Bearer <worker-token>
+```
+
+HTTPS is required except for localhost development. Redirects are rejected.
+
+### Execute phase
+
+`execute` works in an isolated worktree/container and returns only:
+
+```ts
+interface CodingTaskResult {
+  patch: AgentPatch
+  commands: CommandResult[]
+  tests: TestResult[]
+  evaluation?: ChangeEvaluation
+}
+```
+
+It must not push a branch or open a PR. A response containing `pullRequestUrl` or `branchPublished: true` is rejected as a protocol violation.
+
+### Review phase
+
+`review` must return a schema-valid independent decision:
+
+```ts
+interface PatchReviewResult {
+  decision: PolicyDecision
+  notes: string[]
+}
+```
+
+The writing model must not be the only reviewer for high-risk changes.
+
+### Publish phase
+
+`publish` is called only after validation. It must:
+
+1. verify the same base commit, run, plan and patch
+2. apply the validated patch in the isolated worktree
+3. commit logical changes
+4. push only `agent/{adapter}/{task-id}`
+5. open a pull request
+6. return the exact branch name and PR URL
+7. never merge
+
+An unexpected branch name is rejected.
+
+## Sandbox requirements
+
+The bridge must prove that it:
+
+- checked out the exact `baseCommit`
+- created the supplied branch and isolated worktree/container
+- mounted only the temporary worktree writable
+- did not mount production data, RAG secrets or credentials
+- enforced CPU, memory, runtime, command, file, patch, token and cost limits
+- enforced a network policy
+- did not interpolate untrusted task text into shell commands
+- produced a unified diff
+- ran the requested tests/builds
+- can stop and clean up the run
 
 ## Persistent audit records
 
-The API persists:
+The API stores task, base commit, branch, plan, patch, commands, tests, evaluation, policy decisions, PR URL, audit events and failure/cancellation reason under `CODING_AGENT_STORAGE_ROOT` using owner-only file permissions.
 
-- task
-- exact base commit
-- isolated branch name
-- plan
-- patch metadata and diff
-- command results
-- test results
-- evaluation
-- policy decisions
-- PR URL
-- audit events
-- failure or cancellation reason
+If the API restarts during an active run, the record becomes `failed` with `agent.server_restarted`. It is not silently resumed.
 
-If the API server restarts while a run is active, the stored run becomes `failed` with `agent.server_restarted`. It is never silently resumed against a potentially different checkout.
+Duplicate task IDs are rejected. Concurrent execution is limited by `CODING_AGENT_MAX_CONCURRENT_RUNS`.
 
-## API authentication
+## Protected administration API
 
-All coding-agent routes require a separate administrator token:
-
-```http
-Authorization: Bearer <CODING_AGENT_ADMIN_TOKEN>
-```
-
-or:
-
-```http
-X-Coding-Agent-Admin-Token: <CODING_AGENT_ADMIN_TOKEN>
-```
-
-The token must contain at least 24 characters and must never use a `VITE_*` variable.
-
-Routes:
+All routes require `CODING_AGENT_ADMIN_TOKEN` via Bearer auth or `X-Coding-Agent-Admin-Token`:
 
 ```text
 GET  /api/coding-agent/capabilities
@@ -235,61 +245,11 @@ POST /api/coding-agent/runs/:id/stop
 
 There is no merge endpoint.
 
-## External bridge contract
-
-The project adapters call fixed HTTPS endpoints:
-
-```text
-POST /v1/adapters/openhands/analyze
-POST /v1/adapters/openhands/plan
-POST /v1/adapters/openhands/execute
-POST /v1/adapters/openhands/review
-POST /v1/adapters/openhands/stop
-
-POST /v1/adapters/aider/analyze
-POST /v1/adapters/aider/plan
-POST /v1/adapters/aider/execute
-POST /v1/adapters/aider/review
-POST /v1/adapters/aider/stop
-```
-
-Authentication:
-
-```http
-Authorization: Bearer <worker-token>
-```
-
-Redirects are rejected. HTTPS is required except for localhost development.
-
-The execute response must contain:
-
-```ts
-interface CodingTaskResult {
-  patch: AgentPatch
-  commands: CommandResult[]
-  tests: TestResult[]
-  evaluation?: ChangeEvaluation
-  pullRequestUrl?: string
-}
-```
-
-The bridge is responsible for proving that it:
-
-1. checked out the exact `baseCommit`
-2. created the supplied `branchName`
-3. created an isolated worktree/container
-4. mounted only the temporary worktree writable
-5. did not mount production data
-6. applied CPU, memory, runtime and network limits
-7. executed commands without interpolating untrusted shell text
-8. produced a unified diff
-9. ran the requested validation
-10. pushed only the agent branch
-11. opened a PR without merging it
+The `/coding-agent` inspector keeps the admin token only in component memory. It shows capabilities, repository-map status, task plan, diff, tests, policy, audit, stop control and PR link. Patch content is blocked from session replay.
 
 ## OpenTelemetry
 
-The API records spans/events including:
+The run manager emits:
 
 ```text
 agent.task.created
@@ -308,26 +268,13 @@ agent.run.completed
 agent.run.cancelled
 ```
 
-Span attributes contain identifiers, counts, branch names, status and risk level. Tokens, credentials, command output and source diffs are not attached to telemetry spans.
+Telemetry contains IDs, counts, branch, status and risk. Tokens, credentials, raw command output and diffs are not attached to spans.
 
-## Deployment
+## Deployment and validation
 
-See `deployment/asset-pipeline.env.example` for:
+Configuration is documented in `deployment/asset-pipeline.env.example`.
 
-- persistent storage path
-- exact base commit
-- admin token
-- shared or per-adapter bridge URLs/tokens
-- worker timeout
-- concurrency setting
-
-The coding-agent system remains disabled until:
-
-- an exact base commit is configured
-- an external adapter bridge is configured
-- a valid admin token is configured
-
-## Validation commands
+The system remains disabled until an exact commit SHA, admin token and at least one external adapter bridge are configured.
 
 ```bash
 pnpm test:coding-agent
@@ -336,4 +283,4 @@ pnpm test:integration
 pnpm build
 ```
 
-Passing local domain tests does not prove the external bridge sandbox is secure. The bridge deployment requires a separate infrastructure review and an end-to-end test using a disposable repository.
+Local domain tests do not prove the external sandbox deployment is secure. The bridge requires an infrastructure review and an end-to-end test against a disposable repository before production use.
