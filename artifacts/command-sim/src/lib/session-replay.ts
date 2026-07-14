@@ -13,6 +13,7 @@ let provider: ReplayProvider = "disabled";
 let stopRecording: (() => void) | undefined;
 let flushTimer: number | undefined;
 let rrwebQueue: unknown[] = [];
+let highlightInitialized = false;
 
 export function getReplayConsent(): ReplayConsent {
   if (typeof window === "undefined") return null;
@@ -40,26 +41,34 @@ export async function startSessionReplay(): Promise<ReplayProvider> {
 
   const projectId = import.meta.env.VITE_HIGHLIGHT_PROJECT_ID?.trim();
   if (projectId) {
-    H.init(projectId, {
-      manualStart: true,
-      privacySetting: "strict",
-      disableConsoleRecording: true,
-      enableCanvasRecording: false,
-      enablePerformanceRecording: true,
-      inlineImages: false,
-      tracingOrigins: [window.location.origin, /^\//],
-      urlBlocklist: [
-        "/api/asset-generation/worker",
-        "/api/observability/replay",
-        ".env",
-        "authorization",
-        "api-key",
-        "token",
-      ],
-      serviceName: "operation-kobenhavn-web",
-      environment: import.meta.env.MODE,
-      otel: true,
-    });
+    if (!highlightInitialized) {
+      H.init(projectId, {
+        manualStart: true,
+        privacySetting: "strict",
+        disableConsoleRecording: true,
+        enableCanvasRecording: false,
+        enablePerformanceRecording: true,
+        inlineImages: false,
+        tracingOrigins: [window.location.origin, /^\//],
+        networkRecording: {
+          enabled: true,
+          recordHeadersAndBody: false,
+          urlBlocklist: [
+            "/api/asset-generation/worker",
+            "/api/observability/replay",
+            ".env",
+            "authorization",
+            "api-key",
+            "token",
+          ],
+        },
+        serviceName: "operation-kobenhavn-web",
+        environment: import.meta.env.MODE,
+        storageMode: "sessionStorage",
+        otel: { instrumentations: {} },
+      });
+      highlightInitialized = true;
+    }
     H.start();
     provider = "highlight";
     return provider;
@@ -108,7 +117,7 @@ export function stopSessionReplay(): void {
   provider = "disabled";
 }
 
-export function installReplayPrivacyMarkers(root: ParentNode = document): void {
+export function installReplayPrivacyMarkers(root: ParentNode = document): () => void {
   const mark = () => {
     root.querySelectorAll(".monaco-editor, [data-secret], [data-token], [data-api-key]").forEach(element => {
       element.setAttribute("data-replay-block", "true");
@@ -120,6 +129,7 @@ export function installReplayPrivacyMarkers(root: ParentNode = document): void {
   mark();
   const observer = new MutationObserver(mark);
   observer.observe(document.documentElement, { childList: true, subtree: true });
+  return () => observer.disconnect();
 }
 
 async function flushRrweb(): Promise<void> {
@@ -127,7 +137,7 @@ async function flushRrweb(): Promise<void> {
   const events = rrwebQueue.splice(0, MAX_BATCH_EVENTS);
   const sessionId = getOrCreateSessionId();
   try {
-    await window.fetch(`/api/observability/replay/${encodeURIComponent(sessionId)}`, {
+    const response = await window.fetch(`/api/observability/replay/${encodeURIComponent(sessionId)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -137,6 +147,7 @@ async function flushRrweb(): Promise<void> {
       }),
       keepalive: true,
     });
+    if (!response.ok) throw new Error(`Replay ingest failed with HTTP ${response.status}.`);
   } catch {
     rrwebQueue.unshift(...events.slice(-MAX_BATCH_EVENTS));
   }
