@@ -5,6 +5,7 @@
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "setup": "node scripts/setup.mjs",
+    "deployment:start": "node deployment/bootstrap.mjs",
     "dev": "pnpm --filter @workspace/api-server dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "build:frontend": "pnpm --filter @workspace/command-sim build",
