@@ -99,9 +99,9 @@ export class CodingAgentRunManager {
         commands: result.commands,
         tests: result.tests,
         ...(result.evaluation ? { evaluation: result.evaluation } : {}),
-        ...(result.pullRequestUrl ? { pullRequestUrl: result.pullRequestUrl } : {}),
       });
       await this.notify("agent.patch.created", run, { filesChanged: result.patch.changedFiles.length, additions: result.patch.additions, deletions: result.patch.deletions });
+      await this.notify("agent.test.started", run, { expectedTests: result.tests.length });
 
       const deterministic = validateAgentPatch({ task: run.task, repositoryMap, patch: result.patch });
       const adapterReview = deterministic.decision.accepted
@@ -126,15 +126,20 @@ export class CodingAgentRunManager {
         return structuredClone(run);
       }
 
-      const requiresReview = true;
-      run = this.updateRun(run.id, {
-        status: requiresReview ? "awaiting_review" : "completed",
-        policyDecision,
-      });
+      run = this.updateRun(run.id, { policyDecision });
       await this.notify("agent.test.completed", run, { tests: result.tests.map(test => ({ name: test.name, passed: test.passed })) });
       if (result.evaluation) await this.notify("agent.evaluation.completed", run, { verdict: result.evaluation.verdict });
-      if (result.pullRequestUrl) await this.notify("agent.pull_request.created", run, { pullRequestUrl: result.pullRequestUrl });
-      await this.notify("agent.run.completed", run, { awaitingHumanReview: requiresReview });
+
+      if (run.task.createPullRequest) {
+        run = this.updateRun(run.id, { status: "publishing" });
+        const published = await adapter.publishPullRequest({ run, repositoryMap, plan, patch: result.patch });
+        run = this.updateRun(run.id, { status: "awaiting_review", pullRequestUrl: published.pullRequestUrl });
+        await this.notify("agent.pull_request.created", run, { pullRequestUrl: published.pullRequestUrl, branchName: published.branchName });
+      } else {
+        run = this.updateRun(run.id, { status: "awaiting_review" });
+      }
+
+      await this.notify("agent.run.completed", run, { awaitingHumanReview: true, pullRequestCreated: Boolean(run.pullRequestUrl) });
       return structuredClone(run);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
