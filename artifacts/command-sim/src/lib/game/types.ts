@@ -1,3 +1,5 @@
+import type { StrategySimulationSnapshot } from "@workspace/strategy-sim";
+
 // Core domain types for the Nordlys Command tactical simulation engine.
 // The persisted Scenario.board JSON must match BoardState.
 
@@ -125,6 +127,7 @@ export interface BoardState {
   world?: BoardWorldState;
   generatedContent?: GeneratedGameContent;
   simulation?: SimulationState;
+  strategySnapshot?: StrategySimulationSnapshot;
   sources?: SourceReference[];
   tutorialCompleted?: boolean;
 }
