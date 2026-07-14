@@ -10,11 +10,15 @@ import {
   validateWorldAssetPlacement,
 } from "@workspace/geo-world";
 import { importWorldRegionFromOverpass } from "../lib/overpass-client";
+import { assetGenerationManager } from "../lib/asset-generation";
+import { worldStorage } from "../lib/world-storage";
 import { logger } from "../lib/logger";
 import { withSpan } from "../lib/telemetry";
 
 const router: IRouter = Router();
 const PublicOsmCategorySchema = z.enum(PUBLIC_OSM_CATEGORIES);
+const BUILTIN_WORLD_ASSETS = new Set(["builtin:map-marker", "builtin:vision-beacon"]);
+const ALLOWED_PLACEMENT_ROLES = new Set(["decoration", "business", "hospital", "police", "social_hub", "vision"]);
 
 const ImportRegionRequestSchema = z.object({
   bounds: GeoBoundsSchema,
@@ -22,7 +26,7 @@ const ImportRegionRequestSchema = z.object({
   chunkZoom: z.number().int().min(0).max(24).default(15),
 });
 
-const PlacementRequestSchema = z.object({
+const PlacementValidationRequestSchema = z.object({
   asset: PlacedWorldAssetSchema,
   policy: z.object({
     bounds: GeoBoundsSchema,
@@ -34,6 +38,11 @@ const PlacementRequestSchema = z.object({
   }),
 });
 
+const SavePlacementRequestSchema = z.object({
+  regionId: z.string().min(1).max(180),
+  asset: PlacedWorldAssetSchema,
+});
+
 router.get("/world/capabilities", (_req, res): void => {
   res.json({
     coordinateSystem: "WGS84 + local tangent plane",
@@ -41,6 +50,7 @@ router.get("/world/capabilities", (_req, res): void => {
     editableWorldSource: "open-licensed-vector-data",
     googleEarthAssetExtraction: false,
     supportedCategories: PUBLIC_OSM_CATEGORIES,
+    builtinWorldAssets: [...BUILTIN_WORLD_ASSETS],
     maximumAreaSquareKilometers: positiveNumber(process.env.WORLD_IMPORT_MAX_AREA_KM2, 100),
     maximumChunks: positiveNumber(process.env.WORLD_IMPORT_MAX_CHUNKS, 400),
     overpassConfigured: Boolean(process.env.OVERPASS_API_URL || process.env.OVERPASS_API_URLS),
@@ -51,9 +61,27 @@ router.post("/world/regions/import-osm", async (req, res): Promise<void> => {
   try {
     const input = ImportRegionRequestSchema.parse(req.body);
     const region = await importWorldRegionFromOverpass(input);
-    res.status(201).json({ region });
+    const stored = await worldStorage.saveRegion(region);
+    res.status(201).json({ region: stored });
   } catch (error) {
     sendError(res, error, 400);
+  }
+});
+
+router.get("/world/regions", async (req, res): Promise<void> => {
+  try {
+    const limit = Number(req.query.limit ?? 100);
+    res.json({ regions: await worldStorage.listRegions(limit) });
+  } catch (error) {
+    sendError(res, error, 500);
+  }
+});
+
+router.get("/world/regions/:id", async (req, res): Promise<void> => {
+  try {
+    res.json({ region: await worldStorage.getRegion(req.params.id) });
+  } catch (error) {
+    sendError(res, error, 404);
   }
 });
 
@@ -75,7 +103,7 @@ router.post("/world/locations/validate-role", async (req, res): Promise<void> =>
 
 router.post("/world/assets/validate-placement", async (req, res): Promise<void> => {
   try {
-    const input = PlacementRequestSchema.parse(req.body);
+    const input = PlacementValidationRequestSchema.parse(req.body);
     const result = await withSpan("game.world.asset_placement.validate", {
       "world.asset.id": input.asset.assetId,
       "world.placement.version": input.asset.version,
@@ -90,6 +118,54 @@ router.post("/world/assets/validate-placement", async (req, res): Promise<void> 
     res.status(result.valid ? 200 : 422).json(result);
   } catch (error) {
     sendError(res, error, 400);
+  }
+});
+
+router.get("/world/assets/placements", async (req, res): Promise<void> => {
+  try {
+    const regionId = typeof req.query.regionId === "string" ? req.query.regionId : undefined;
+    res.json({ placements: await worldStorage.listPlacements(regionId) });
+  } catch (error) {
+    sendError(res, error, 500);
+  }
+});
+
+router.post("/world/assets/placements", async (req, res): Promise<void> => {
+  try {
+    const input = SavePlacementRequestSchema.parse(req.body);
+    const region = await worldStorage.getRegion(input.regionId);
+    const allowedAssetIds = await publishedAndBuiltinAssetIds();
+    const result = await withSpan("game.world.asset_placement", {
+      "world.region.id": input.regionId,
+      "world.asset.id": input.asset.assetId,
+      "world.placement.version": input.asset.version,
+    }, () => validateWorldAssetPlacement(input.asset, {
+      bounds: region.bounds,
+      maximumScale: 20,
+      minimumAltitude: -100,
+      maximumAltitude: 10_000,
+      allowedAssetIds,
+      allowedRoles: ALLOWED_PLACEMENT_ROLES,
+    }));
+    if (!result.valid || !result.asset) {
+      res.status(422).json(result);
+      return;
+    }
+    const record = await worldStorage.upsertPlacement(input.regionId, result.asset);
+    res.status(201).json({ placement: record });
+  } catch (error) {
+    sendError(res, error, 409);
+  }
+});
+
+router.delete("/world/assets/placements/:id", async (req, res): Promise<void> => {
+  try {
+    const regionId = z.string().min(1).max(180).parse(req.query.regionId);
+    const version = z.coerce.number().int().positive().parse(req.query.version);
+    const deleted = await worldStorage.deletePlacement(regionId, req.params.id, version);
+    res.status(deleted ? 200 : 404).json({ deleted });
+  } catch (error) {
+    sendError(res, error, 409);
   }
 });
 
@@ -114,11 +190,17 @@ router.post("/mcp/tools/generate_world_region", async (req, res): Promise<void> 
   try {
     const input = ImportRegionRequestSchema.parse(req.body);
     const region = await importWorldRegionFromOverpass(input);
-    res.status(201).json({ tool: "generate_world_region", region });
+    const stored = await worldStorage.saveRegion(region);
+    res.status(201).json({ tool: "generate_world_region", region: stored });
   } catch (error) {
     sendError(res, error, 400);
   }
 });
+
+async function publishedAndBuiltinAssetIds(): Promise<Set<string>> {
+  const manifest = await assetGenerationManager.storage.readManifest();
+  return new Set([...BUILTIN_WORLD_ASSETS, ...manifest.map(entry => entry.id)]);
+}
 
 function sendError(res: Response, error: unknown, status: number): void {
   if (error instanceof z.ZodError) {
