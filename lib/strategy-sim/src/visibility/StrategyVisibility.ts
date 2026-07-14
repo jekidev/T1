@@ -30,7 +30,7 @@ export function buildFactionView(input: {
   const visibleEntities: StrategyEntity[] = [];
   const rememberedEntities: StrategyVisibilityMemoryRecord[] = [];
   const omittedEntityIds: string[] = [];
-  const memory: StrategyVisibilityMemory = structuredClone(input.previousMemory ?? {});
+  const memory: StrategyVisibilityMemory = {};
 
   for (const entity of input.entities) {
     const friendly = entity.faction?.factionId === input.factionId;
@@ -46,9 +46,11 @@ export function buildFactionView(input: {
       continue;
     }
 
-    const remembered = memory[entity.identity.id];
+    const remembered = input.previousMemory?.[entity.identity.id];
     if (remembered && shouldRemember(entity)) {
-      rememberedEntities.push(structuredClone(remembered));
+      const clone = structuredClone(remembered);
+      rememberedEntities.push(clone);
+      memory[entity.identity.id] = clone;
       continue;
     }
 
