@@ -51,6 +51,39 @@ function summarizeObservability(): string {
   ].join("\n");
 }
 
+function localFallback(board: Record<string, unknown>, userMessage: string): string {
+  const entities = Array.isArray(board["entities"]) ? board["entities"].length : 0;
+  const zones = Array.isArray(board["zones"]) ? board["zones"].length : 0;
+  const phases = Array.isArray(board["phases"]) ? board["phases"].length : 0;
+  const events = listObservabilityEvents(60);
+  const errors = events.filter((event) => event.level === "error");
+  const warnings = events.filter((event) => event.level === "warn");
+  const latest = [...events].reverse().slice(0, 5);
+
+  const observations = [
+    `Board snapshot: ${entities} entities, ${zones} zones, ${phases} phases.`,
+    `Runtime telemetry: ${errors.length} errors and ${warnings.length} warnings in the current buffer.`,
+    ...latest.map((event) => `- ${event.source}/${event.type}: ${event.message}`),
+  ];
+
+  return [
+    "[LOCAL FALLBACK MODE — external LLM routes are currently unavailable]",
+    "",
+    "Observed facts:",
+    ...observations,
+    "",
+    "Recommended next checks:",
+    "1. Inspect the newest error event and reproduce the action that triggered it.",
+    "2. Verify /api/healthz/llm and confirm at least one OpenRouter key and model route are available.",
+    "3. Capture a DOM snapshot from Developer AI if the problem is visual or interaction-related.",
+    "4. Export a review package before changing code.",
+    "",
+    `Your request was: ${userMessage.slice(0, 800)}`,
+    "",
+    "This fallback is deterministic and does not claim model-generated reasoning. Retry when an external route is healthy for a deeper analysis.",
+  ].join("\n");
+}
+
 router.post("/advisor/chat", async (req, res): Promise<void> => {
   const body = SendAdvisorMessageBody.parse(req.body);
   const systemPrompt = ROLE_SYSTEM_PROMPTS[body.role] ?? ROLE_SYSTEM_PROMPTS["neutral_analyst"]!;
@@ -70,10 +103,13 @@ router.post("/advisor/chat", async (req, res): Promise<void> => {
 
   try {
     const reply = await chatWithOpenRouter(messages);
-    res.json({ reply });
+    res.json({ reply, mode: "external_llm" });
   } catch (err) {
-    req.log.error({ err }, "Advisor chat failed");
-    res.status(502).json({ message: "The AI advisor is currently unavailable." });
+    req.log.error({ err }, "Advisor chat failed; using local fallback");
+    res.json({
+      reply: localFallback(body.board as Record<string, unknown>, body.message),
+      mode: "local_fallback",
+    });
   }
 });
 
