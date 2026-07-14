@@ -13,6 +13,7 @@ node_modules
 
 # Runtime-generated data
 /data/asset-pipeline/
+/data/coding-agent/
 /data/session-replay/
 /data/world/
 /services/asset-worker/work/
