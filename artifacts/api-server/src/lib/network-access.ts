@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { recordObservabilityEvent } from "./observability";
 
@@ -17,6 +18,11 @@ export interface NetworkAccessSession {
   expiresAt: string;
 }
 
+export interface ResolvedPublicAddress {
+  address: string;
+  family: 4 | 6;
+}
+
 export interface NetworkApprovalRequest {
   id: string;
   sessionId: string;
@@ -24,11 +30,10 @@ export interface NetworkApprovalRequest {
   targetOrigin: string;
   targetPath: string;
   reason: string;
-  status: "pending" | "approved" | "denied";
+  status: "pending" | "approved" | "denied" | "consumed";
   createdAt: string;
   expiresAt: string;
   decidedAt?: string;
-  lastUsedAt?: string;
 }
 
 interface InternalSession extends NetworkAccessSession {
@@ -120,20 +125,22 @@ export async function requireNetworkAccess(input: {
   capability: NetworkCapability;
   targetUrl: string;
   reason: string;
-}): Promise<{ session: NetworkAccessSession; url: URL; mode: NetworkAccessMode }> {
+}): Promise<{ session: NetworkAccessSession; url: URL; mode: NetworkAccessMode; resolvedAddresses: ResolvedPublicAddress[] }> {
   const session = requireSession(input.sessionId, input.token);
   const url = validatePublicHttpsUrl(input.targetUrl);
   const reason = input.reason.trim().slice(0, 500);
   if (!reason) throw new Error("A concrete reason is required for internet access.");
 
   if (session.mode === "ultra") {
+    const resolvedAddresses = await resolvePublicAddresses(url.hostname);
     audit("network.request.auto_approved", session, {
       capability: input.capability,
       targetOrigin: url.origin,
       targetPath: truncatePath(url.pathname),
       mode: "ultra",
+      resolvedAddressCount: resolvedAddresses.length,
     });
-    return { session: publicSession(session), url, mode: session.mode };
+    return { session: publicSession(session), url, mode: session.mode, resolvedAddresses };
   }
 
   const approved = [...approvals.values()].find(approval =>
@@ -145,13 +152,16 @@ export async function requireNetworkAccess(input: {
     && Date.parse(approval.expiresAt) > Date.now(),
   );
   if (approved) {
-    approved.lastUsedAt = new Date().toISOString();
-    audit("network.approval.used", session, {
+    const resolvedAddresses = await resolvePublicAddresses(url.hostname);
+    approved.status = "consumed";
+    approved.decidedAt = new Date().toISOString();
+    audit("network.approval.consumed", session, {
       approvalId: approved.id,
       capability: input.capability,
       targetOrigin: url.origin,
+      resolvedAddressCount: resolvedAddresses.length,
     });
-    return { session: publicSession(session), url, mode: session.mode };
+    return { session: publicSession(session), url, mode: session.mode, resolvedAddresses };
   }
 
   const existing = [...approvals.values()].find(approval =>
@@ -195,12 +205,27 @@ export function validatePublicHttpsUrl(value: string): URL {
   if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) {
     throw new Error("Local network targets are blocked.");
   }
-  if (hostname === "169.254.169.254" || hostname === "metadata.google.internal") {
+  if (hostname === "169.254.169.254" || hostname === "metadata.google.internal" || hostname === "100.100.100.200") {
     throw new Error("Cloud metadata targets are blocked.");
   }
   if (isIP(hostname) && isPrivateIp(hostname)) throw new Error("Private and link-local IP targets are blocked.");
   url.hash = "";
   return url;
+}
+
+export async function resolvePublicAddresses(hostnameInput: string): Promise<ResolvedPublicAddress[]> {
+  const hostname = hostnameInput.toLowerCase().replace(/\.$/, "");
+  const directFamily = isIP(hostname);
+  const resolved = directFamily
+    ? [{ address: hostname, family: directFamily as 4 | 6 }]
+    : await lookup(hostname, { all: true, verbatim: true });
+  if (resolved.length === 0) throw new Error("Internet hostname did not resolve to an address.");
+  const unique = [...new Map(resolved.map(item => [item.address, { address: item.address, family: item.family as 4 | 6 }])).values()]
+    .sort((a, b) => a.family - b.family || a.address.localeCompare(b.address));
+  if (unique.some(item => isPrivateIp(item.address))) {
+    throw new Error("Internet hostname resolves to a private, link-local, multicast or metadata address.");
+  }
+  return unique;
 }
 
 function requireSession(sessionId: string, token: string): InternalSession {
@@ -232,10 +257,12 @@ function truncatePath(pathname: string): string {
 function isPrivateIp(hostname: string): boolean {
   if (hostname.includes(":")) {
     const normalized = hostname.toLowerCase();
-    return normalized === "::1"
+    return normalized === "::"
+      || normalized === "::1"
       || normalized.startsWith("fc")
       || normalized.startsWith("fd")
-      || normalized.startsWith("fe80:");
+      || normalized.startsWith("fe80:")
+      || normalized.startsWith("ff");
   }
   const octets = hostname.split(".").map(Number);
   if (octets.length !== 4 || octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) return true;
