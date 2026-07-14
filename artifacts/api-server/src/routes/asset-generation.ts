@@ -5,7 +5,11 @@ import {
   ASSET_PROVIDER_CATALOG,
   AssetArtifactSchema,
   AssetJobRequestSchema,
+  LicenseStatusSchema,
+  validateGeneratedAssetMetadata,
   type AssetJob,
+  type AssetValidationIssue,
+  type AssetValidationReport,
 } from "@workspace/asset-pipeline";
 import {
   assetGenerationManager,
@@ -44,6 +48,7 @@ router.get("/asset-generation/capabilities", (_req, res): void => {
     blenderConfigured: Boolean(process.env.ASSET_BLENDER_WORKER_URL),
     publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
     workerAuthenticationConfigured: Boolean(process.env.ASSET_WORKER_TOKEN),
+    assetReviewConfigured: Boolean(process.env.ASSET_REVIEW_ADMIN_TOKEN),
   });
 });
 
@@ -73,7 +78,12 @@ router.post("/asset-generation/sources", async (req, res): Promise<void> => {
 
 router.post("/asset-generation/jobs", async (req, res): Promise<void> => {
   try {
-    const request = AssetJobRequestSchema.parse(req.body);
+    const parsed = AssetJobRequestSchema.parse(req.body);
+    const request = {
+      ...parsed,
+      licenseStatus: parsed.licenseStatus === "restricted" ? "restricted" as const : "unverified" as const,
+      publishAfterValidation: false,
+    };
     const job = await withSpan("asset.job.create", {
       "asset.job.kind": request.kind,
       "asset.license.status": request.licenseStatus,
@@ -117,7 +127,31 @@ router.post("/asset-generation/jobs/:id/retry", async (req, res): Promise<void> 
   }
 });
 
-router.post("/asset-generation/jobs/:id/publish", async (req, res): Promise<void> => {
+router.post("/asset-generation/jobs/:id/license-review", requireAssetReviewer, async (req, res): Promise<void> => {
+  try {
+    const licenseStatus = LicenseStatusSchema.parse(req.body?.licenseStatus);
+    const job = await assetGenerationManager.getJob(req.params.id);
+    if (!job.metadata || !job.validation) {
+      res.status(409).json({ error: "Job must finish output validation before license review." });
+      return;
+    }
+    const metadata = { ...job.metadata, licenseStatus };
+    const validation = mergeLicenseValidation(metadata, job.validation);
+    const next: AssetJob = {
+      ...job,
+      request: { ...job.request, licenseStatus, publishAfterValidation: false },
+      metadata,
+      validation,
+      updatedAt: new Date().toISOString(),
+    };
+    await assetGenerationManager.storage.writeJob(next);
+    res.json({ job: next });
+  } catch (error) {
+    sendError(res, error, 400);
+  }
+});
+
+router.post("/asset-generation/jobs/:id/publish", requireAssetReviewer, async (req, res): Promise<void> => {
   try {
     const job = await withSpan("asset.publish", { "asset.job.id": req.params.id }, () =>
       assetGenerationManager.publishJob(req.params.id));
@@ -179,9 +213,9 @@ router.put(
         return;
       }
       const maximumBytes = 750 * 1024 * 1024;
-      const job = await assetGenerationManager.getJob(req.params.id);
-      if (["published", "cancelled"].includes(job.status)) {
-        res.status(409).json({ error: `Cannot add artifacts to ${job.status} job.` });
+      const initial = await assetGenerationManager.getJob(req.params.id);
+      if (["published", "cancelled"].includes(initial.status)) {
+        res.status(409).json({ error: `Cannot add artifacts to ${initial.status} job.` });
         return;
       }
       const artifact = await withSpan("asset.artifact.upload", {
@@ -196,10 +230,15 @@ router.put(
         mimeType,
         maximumBytes,
       ));
+      const current = await assetGenerationManager.getJob(req.params.id);
+      if (["published", "cancelled"].includes(current.status)) {
+        res.status(409).json({ error: `Job changed to ${current.status} while artifact upload was in progress.` });
+        return;
+      }
       const next: AssetJob = {
-        ...job,
+        ...current,
         updatedAt: new Date().toISOString(),
-        artifacts: [...job.artifacts.filter(item => item.sha256 !== artifact.sha256), artifact],
+        artifacts: [...current.artifacts.filter(item => item.sha256 !== artifact.sha256), artifact],
       };
       await assetGenerationManager.storage.writeJob(next);
       res.status(201).json({ artifact });
@@ -208,6 +247,29 @@ router.put(
     }
   },
 );
+
+function mergeLicenseValidation(
+  metadata: NonNullable<AssetJob["metadata"]>,
+  previous: AssetValidationReport,
+): AssetValidationReport {
+  const metadataValidation = validateGeneratedAssetMetadata(metadata);
+  const retainedIssues: AssetValidationIssue[] = previous.issues.filter(issue => issue.code.startsWith("artifact."));
+  const issues = [...metadataValidation.issues, ...retainedIssues];
+  const checks = {
+    ...metadataValidation.checks,
+    gltf: previous.checks.gltf,
+    ...(previous.checks.animation === undefined ? {} : { animation: previous.checks.animation }),
+  };
+  return {
+    valid: metadataValidation.valid
+      && retainedIssues.every(issue => issue.severity !== "error")
+      && checks.gltf
+      && (metadata.assetType !== "animation" || checks.animation === true),
+    checkedAt: new Date().toISOString(),
+    issues,
+    checks,
+  };
+}
 
 function streamStoredFile(
   res: Response,
@@ -239,6 +301,31 @@ function requireWorker(req: Request, res: Response, next: () => void): void {
     return;
   }
   next();
+}
+
+function requireAssetReviewer(req: Request, res: Response, next: () => void): void {
+  const expected = process.env.ASSET_REVIEW_ADMIN_TOKEN;
+  if (!expected || expected.length < 24) {
+    res.status(503).json({ error: "Asset review is disabled until ASSET_REVIEW_ADMIN_TOKEN is configured." });
+    return;
+  }
+  const headerToken = firstHeader(req, "x-asset-review-token");
+  const authorization = firstHeader(req, "authorization");
+  const bearer = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!constantTimeEqual(expected, headerToken ?? bearer ?? "")) {
+    res.status(401).json({ error: "Invalid asset reviewer credential." });
+    return;
+  }
+  next();
+}
+
+function constantTimeEqual(expected: string, supplied: string): boolean {
+  if (expected.length !== supplied.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ supplied.charCodeAt(index);
+  }
+  return mismatch === 0;
 }
 
 function normalizeMimeType(value: string | string[] | undefined): string | undefined {
