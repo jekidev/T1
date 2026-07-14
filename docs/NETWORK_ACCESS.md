@@ -10,7 +10,7 @@ Ask First with no explicit hosts and capabilities becomes:
 network authorization = deny
 ```
 
-The normal in-game advisor has no browser/search/arbitrary-fetch tool. A model-provider API request is not browser permission, and the advisor is instructed never to claim live web research.
+The normal in-game advisor has no browser, search or arbitrary-fetch tool. A model-provider API request is not browser permission, and the advisor is instructed never to claim live web research.
 
 Coding agents run behind a separate infrastructure egress boundary:
 
@@ -31,12 +31,14 @@ Prompt text alone is not considered network enforcement.
 Each external request exposes:
 
 - capability
-- origin
-- path
+- exact origin
+- exact path and query
 - reason
 - expiry
 
-The user approves or denies that matching request. Approval is consumed after one request. Every redirect creates a new authorization decision and is DNS-validated again.
+The user approves or denies that matching target. An approval remains valid only for the same exact capability, origin, path and query during the temporary session. A different file, query or redirect destination creates a separate authorization decision and is DNS-validated again.
+
+This session-scoped behavior avoids redirect approval loops without granting origin-wide access.
 
 ### Coding-agent runs
 
@@ -66,11 +68,11 @@ issue_tracker
 
 ## Ultra
 
-Ultra is never the default. It requires explicit confirmation, `approvedBy` and `approvedAt` for the temporary session/run.
+Ultra is never the default. It requires explicit confirmation, `approvedBy` and `approvedAt` for the temporary session or run.
 
 Ultra permits public HTTPS retrieval without prompting for each origin during that session. It does **not** permit:
 
-- private/local/link-local/multicast networks
+- private, local, link-local or multicast networks
 - cloud metadata endpoints
 - credentials embedded in URLs
 - non-HTTPS requests or non-standard ports
@@ -92,7 +94,7 @@ The RAG importer:
 3. rejects localhost, `.local` and metadata hosts
 4. resolves every hostname
 5. rejects the hostname if any resolved address is private, link-local, multicast or metadata-related
-6. pins TLS to one validated address while retaining the original hostname for SNI/certificate verification
+6. pins TLS to one validated address while retaining the original hostname for SNI and certificate verification
 7. handles redirects manually
 8. repeats authorization and DNS validation for every redirect
 9. enforces time and byte limits
@@ -117,16 +119,16 @@ interface AgentNetworkAuthorization {
 }
 ```
 
-`execute` must return a schema-valid `AgentNetworkAudit` containing all attempted requests and proof that:
+`execute` must return a schema-valid `AgentNetworkAudit` containing all attempted tool-egress requests and confirmation that:
 
 - a sandbox firewall enforced the policy
 - private networks were blocked
 - metadata endpoints were blocked
-- redirects were revalidated
+- redirects were revalidated at the egress boundary
 
-Any allowed request outside the run authorization rejects the patch before independent review or PR publication.
+Model-provider transport is isolated from tool-egress authorization and is not treated as browsing permission. Any allowed tool request outside the run authorization rejects the patch before independent review or PR publication.
 
-The API cannot cryptographically prove that an independently operated worker reported truthfully. Production deployment therefore requires a controlled worker, firewall/egress-proxy logs or attestation, no production credentials, and an end-to-end test against a disposable repository.
+The API cannot cryptographically prove that an independently operated worker reported truthfully. Production deployment therefore requires the provided internal-only worker network, the dual-homed egress proxy, controlled firewall logs, no production credentials and an end-to-end test against a disposable repository.
 
 ## RAG imports
 
@@ -142,7 +144,7 @@ Source files are append-only. Changed upstream content receives a content-addres
 
 ## UI
 
-The advisor panel contains Ask First/Ultra, explicit Ultra confirmation, book/import controls and Update the world.
+The Developer AI panel contains Ask First/Ultra, explicit Ultra confirmation, book/import controls and Update the world.
 
 The coding-agent inspector contains approved hosts, capability controls and a firewall-audit view. Network-session and administrator tokens remain in component memory and are blocked from session replay.
 
