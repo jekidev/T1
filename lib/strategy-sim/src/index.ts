@@ -1,4 +1,7 @@
 export * from "./StrategySimulation";
+export * from "./blackmail/BlackmailService";
+export * from "./blackmail/BlackmailSystem";
+export * from "./blackmail/config";
 export * from "./commands/types";
 export * from "./commands/CommandQueue";
 export * from "./core/DeterministicRandom";
