@@ -1,4 +1,6 @@
 import type { BlackmailApproach } from "../blackmail/config";
+import type { NPCComponent } from "../npc/types";
+import type { CharacterStatus } from "../status/CharacterStatus";
 
 export interface Vector3Data {
   x: number;
@@ -141,6 +143,8 @@ export interface StrategyEntity {
   unit?: UnitComponent;
   visibility?: VisibilityComponent;
   health?: HealthComponent;
+  characterStatus?: CharacterStatus;
+  npc?: NPCComponent;
   movement?: MovementComponent;
   combat?: CombatComponent;
   morale?: MoraleComponent;
