@@ -1,3 +1,5 @@
+import type { BlackmailApproach } from "../blackmail/config";
+
 export interface Vector3Data {
   x: number;
   y: number;
@@ -29,6 +31,36 @@ export interface FactionStateComponent {
   productionPerTick: Record<string, number>;
   consumptionPerTick: Record<string, number>;
   relations: Record<string, number>;
+}
+
+export interface InfluenceComponent {
+  reputation: number;
+  operationalSecurity: number;
+  suspicion: number;
+  points: number;
+}
+
+export interface BlackmailDossier {
+  evidenceQuality: number;
+  cooldownTicks: number;
+  compromised: boolean;
+  lastAttemptTick?: number;
+}
+
+export interface PendingBlackmailAction {
+  commandId: string;
+  type: "gather" | "execute";
+  targetFactionId: string;
+  approach?: BlackmailApproach;
+}
+
+export interface BlackmailComponent {
+  resistance: number;
+  dossiers: Record<string, BlackmailDossier>;
+  compromisedBy: Record<string, boolean>;
+  pendingActions: PendingBlackmailAction[];
+  intimidatedUntilTick?: number;
+  isolatedUntilTick?: number;
 }
 
 export interface UnitComponent {
@@ -96,6 +128,8 @@ export interface StrategyEntity {
   transform?: TransformComponent;
   faction?: FactionComponent;
   factionState?: FactionStateComponent;
+  influence?: InfluenceComponent;
+  blackmail?: BlackmailComponent;
   unit?: UnitComponent;
   health?: HealthComponent;
   movement?: MovementComponent;
