@@ -8,6 +8,7 @@ import {
   type CodingAgentId,
   type RepositoryMap,
 } from "./types";
+import { buildAgentNetworkAuthorization, validateAgentNetworkAudit } from "./networkPolicy";
 import { evaluateTaskPolicy, expectedAgentBranch } from "./policy";
 import { validateAgentPatch } from "./patchValidator";
 
@@ -69,6 +70,8 @@ export class CodingAgentRunManager {
       branch: run.branchName,
       signal: run.task.signal,
       accepted: policyDecision.accepted,
+      networkMode: run.task.networkPolicy.mode,
+      approvedHostCount: run.task.networkPolicy.approvedHosts.length,
     }));
     void this.notify("agent.task.created", this.getRun(run.id));
     return this.getRun(run.id);
@@ -90,28 +93,39 @@ export class CodingAgentRunManager {
       run = this.updateRun(run.id, { status: "planned", plan });
       await this.notify("agent.plan.created", run, { expectedFiles: plan.expectedFiles.length, validationSteps: plan.validationSteps.length });
 
+      const networkAuthorization = buildAgentNetworkAuthorization(run.task);
       run = this.updateRun(run.id, { status: "executing" });
-      await this.notify("agent.command.started", run, { phase: "adapter.execute" });
-      const result = await adapter.executeTask({ run, repositoryMap, plan });
-      await this.notify("agent.command.completed", run, { commandCount: result.commands.length });
+      await this.notify("agent.command.started", run, {
+        phase: "adapter.execute",
+        networkMode: networkAuthorization.mode,
+        approvedHostCount: networkAuthorization.allowedHosts.length,
+        approvedCapabilities: networkAuthorization.allowedCapabilities,
+      });
+      const result = await adapter.executeTask({ run, repositoryMap, plan, networkAuthorization });
+      await this.notify("agent.command.completed", run, {
+        commandCount: result.commands.length,
+        networkRequestCount: result.networkAudit.requests.length,
+      });
 
       run = this.updateRun(run.id, {
         status: "validating",
         patch: result.patch,
         commands: result.commands,
         tests: result.tests,
+        networkAudit: result.networkAudit,
         ...(result.evaluation ? { evaluation: result.evaluation } : {}),
       });
       await this.notify("agent.patch.created", run, { filesChanged: result.patch.changedFiles.length, additions: result.patch.additions, deletions: result.patch.deletions });
       await this.notify("agent.test.started", run, { expectedTests: result.tests.length });
 
       const deterministic = validateAgentPatch({ task: run.task, repositoryMap, patch: result.patch });
-      const adapterReview = deterministic.decision.accepted
+      const networkDecision = validateAgentNetworkAudit({ authorization: networkAuthorization, audit: result.networkAudit });
+      const adapterReview = deterministic.decision.accepted && networkDecision.accepted
         ? await adapter.reviewPatch({ task: run.task, repositoryMap, plan, patch: result.patch })
         : deterministic;
       const testsPassed = result.tests.length > 0 && result.tests.every(test => test.passed && test.exitCode === 0);
       const evaluationRejected = result.evaluation?.verdict === "reject";
-      const policyDecision = mergeDecisions(deterministic.decision, adapterReview.decision);
+      const policyDecision = mergeDecisions(mergeDecisions(deterministic.decision, networkDecision), adapterReview.decision);
 
       if (!policyDecision.accepted || !testsPassed || evaluationRejected) {
         const reasons = [
@@ -121,10 +135,14 @@ export class CodingAgentRunManager {
         ];
         run = this.updateRun(run.id, {
           status: "rejected",
-          policyDecision: { ...policyDecision, accepted: false, reasons },
-          error: { code: "patch.validation_rejected", message: reasons.join(" ") },
+          policyDecision: { ...policyDecision, accepted: false, reasons: [...new Set(reasons)] },
+          error: { code: "patch.validation_rejected", message: [...new Set(reasons)].join(" ") },
         });
-        await this.notify("agent.patch.rejected", run, { codes: run.policyDecision?.codes ?? [], testsPassed });
+        await this.notify("agent.patch.rejected", run, {
+          codes: run.policyDecision?.codes ?? [],
+          testsPassed,
+          networkAccepted: networkDecision.accepted,
+        });
         return structuredClone(run);
       }
 
