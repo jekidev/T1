@@ -24,10 +24,11 @@ export interface NetworkApprovalRequest {
   targetOrigin: string;
   targetPath: string;
   reason: string;
-  status: "pending" | "approved" | "denied" | "consumed";
+  status: "pending" | "approved" | "denied";
   createdAt: string;
   expiresAt: string;
   decidedAt?: string;
+  lastUsedAt?: string;
 }
 
 interface InternalSession extends NetworkAccessSession {
@@ -144,9 +145,8 @@ export async function requireNetworkAccess(input: {
     && Date.parse(approval.expiresAt) > Date.now(),
   );
   if (approved) {
-    approved.status = "consumed";
-    approved.decidedAt = new Date().toISOString();
-    audit("network.approval.consumed", session, {
+    approved.lastUsedAt = new Date().toISOString();
+    audit("network.approval.used", session, {
       approvalId: approved.id,
       capability: input.capability,
       targetOrigin: url.origin,
