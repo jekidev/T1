@@ -13,6 +13,7 @@ const task: AgentTask = {
   allowedPaths: ["lib/strategy-sim/"],
   labels: [],
   createPullRequest: true,
+  networkPolicy: { mode: "ask_first", approvedHosts: [], approvedCapabilities: [] },
   limits: { maxIterations: 5, maxCommands: 20, maxFilesChanged: 5, maxPatchLines: 100, maxRuntimeMinutes: 10, maxModelTokens: 20000, maxCost: 5 },
 };
 
