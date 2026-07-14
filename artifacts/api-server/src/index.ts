@@ -1,7 +1,9 @@
 import { logger } from "./lib/logger";
+import { installModelNetworkGuard } from "./lib/model-network-guard";
 import { initializeTelemetry, shutdownTelemetry } from "./lib/telemetry";
 import { syncRagIntoPersistentMemory } from "./lib/rag-memory";
 
+installModelNetworkGuard();
 await initializeTelemetry();
 const { default: app } = await import("./app");
 
