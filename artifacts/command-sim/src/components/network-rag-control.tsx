@@ -103,7 +103,7 @@ export function NetworkRagControl({ onMessage, onWorldUpdated }: NetworkRagContr
     if (response.status === 409 && body.code === "network_approval_required" && body.approval) {
       setApproval(body.approval);
       setPendingAction(action);
-      onMessage(`Ask First blocked the network request. Approve ${body.approval.targetOrigin}${body.approval.targetPath} before retrying.`);
+      onMessage(`Ask First blocked the network request. Approve ${body.approval.targetOrigin}${body.approval.targetPath} for this temporary session before retrying.`);
       return;
     }
     if (!response.ok) throw new Error(body.error ?? `RAG import failed with HTTP ${response.status}.`);
@@ -138,7 +138,7 @@ export function NetworkRagControl({ onMessage, onWorldUpdated }: NetworkRagContr
       const retry = decision === "approved" ? pendingAction : null;
       setApproval(null);
       setPendingAction(null);
-      onMessage(decision === "approved" ? "Network request approved once. Retrying the selected import." : "Network request denied.");
+      onMessage(decision === "approved" ? "The exact origin, path and query are approved until this temporary session expires. Retrying the selected import." : "Network request denied.");
       if (retry) await runImport(retry);
     } catch (error) {
       onMessage(error instanceof Error ? error.message : String(error));
@@ -169,9 +169,9 @@ export function NetworkRagControl({ onMessage, onWorldUpdated }: NetworkRagContr
         <div className="space-y-1"><Label className="text-[10px]">Account RAG folder</Label><Input value={accountName} onChange={event => setAccountName(event.target.value)} className="h-8 text-xs" /></div>
         <div className="space-y-1"><Label className="text-[10px]">Internet</Label><Select value={mode} onValueChange={value => { setMode(value as NetworkMode); setUltraConfirmed(false); setApproval(null); }}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ask_first">Ask First</SelectItem><SelectItem value="ultra">Ultra</SelectItem></SelectContent></Select></div>
       </div>
-      {mode === "ask_first" ? <p className="rounded border p-2 text-[10px] text-muted-foreground"><ShieldAlert className="mr-1 inline h-3 w-3" />Each exact remote path is blocked until you approve it. Approval is consumed once.</p> : <label className="flex items-start gap-2 rounded border border-amber-500/50 p-2 text-[10px]"><input type="checkbox" checked={ultraConfirmed} onChange={event => setUltraConfirmed(event.target.checked)} className="mt-0.5" /><span>Ultra: I approve all internet requests for this temporary session.</span></label>}
+      {mode === "ask_first" ? <p className="rounded border p-2 text-[10px] text-muted-foreground"><ShieldAlert className="mr-1 inline h-3 w-3" />Every exact origin, path and query is blocked until you approve it. Approval remains valid only for this temporary session; redirect destinations are checked separately.</p> : <label className="flex items-start gap-2 rounded border border-amber-500/50 p-2 text-[10px]"><input type="checkbox" checked={ultraConfirmed} onChange={event => setUltraConfirmed(event.target.checked)} className="mt-0.5" /><span>Ultra: I approve all public HTTPS internet requests for this temporary session. Private networks and metadata endpoints remain blocked.</span></label>}
 
-      {approval && <div className="rounded border border-amber-500/50 p-2 text-[10px]"><div className="font-semibold">Approval required</div><div className="break-all font-mono">{approval.targetOrigin}{approval.targetPath}</div><p className="mt-1 text-muted-foreground">{approval.reason}</p><div className="mt-2 flex gap-2"><Button size="sm" className="h-7 flex-1" disabled={working} onClick={() => void decideApproval("approved")}><Check className="mr-1 h-3 w-3" />Approve once</Button><Button size="sm" variant="outline" className="h-7 flex-1" disabled={working} onClick={() => void decideApproval("denied")}><X className="mr-1 h-3 w-3" />Deny</Button></div></div>}
+      {approval && <div className="rounded border border-amber-500/50 p-2 text-[10px]"><div className="font-semibold">Approval required</div><div className="break-all font-mono">{approval.targetOrigin}{approval.targetPath}</div><p className="mt-1 text-muted-foreground">{approval.reason}</p><div className="mt-2 flex gap-2"><Button size="sm" className="h-7 flex-1" disabled={working} onClick={() => void decideApproval("approved")}><Check className="mr-1 h-3 w-3" />Approve for session</Button><Button size="sm" variant="outline" className="h-7 flex-1" disabled={working} onClick={() => void decideApproval("denied")}><X className="mr-1 h-3 w-3" />Deny</Button></div></div>}
 
       <div className="grid grid-cols-2 gap-2"><Button size="sm" variant="secondary" disabled={working || (mode === "ultra" && !ultraConfirmed)} onClick={() => void execute({ type: "art_of_war" })}><BookOpen className="mr-1 h-3.5 w-3.5" />Import Art of War</Button><Button size="sm" disabled={working} onClick={() => void updateWorld()}><DatabaseZap className="mr-1 h-3.5 w-3.5" />Update the world</Button></div>
 
