@@ -3,6 +3,7 @@ import {
   ChangeEvaluationSchema,
   CodingTaskPlanSchema,
   CommandResultSchema,
+  PolicyDecisionSchema,
   RepositoryMapSchema,
   TestResultSchema,
   type CodingAgentAdapter,
@@ -12,6 +13,7 @@ import {
   type CodingTaskResult,
   type PatchReviewInput,
   type PatchReviewResult,
+  type PolicyDecision,
   type PublishPullRequestInput,
   type PublishPullRequestResult,
   type RepositoryAnalysisInput,
@@ -66,10 +68,14 @@ export class RemoteCodingAgentAdapter implements CodingAgentAdapter {
   async reviewPatch(input: PatchReviewInput): Promise<PatchReviewResult> {
     const deterministic = validateAgentPatch({ task: input.task, repositoryMap: input.repositoryMap, patch: input.patch });
     if (!deterministic.decision.accepted) return deterministic;
+
     const response = await this.request("review", input);
-    const notes = Array.isArray(response.notes) ? response.notes.filter((value): value is string => typeof value === "string") : [];
+    const remoteDecision = PolicyDecisionSchema.parse(response.decision);
+    const notes = Array.isArray(response.notes)
+      ? response.notes.filter((value): value is string => typeof value === "string").slice(0, 500)
+      : [];
     return {
-      decision: deterministic.decision,
+      decision: mergeReviewDecisions(deterministic.decision, remoteDecision),
       notes: [...deterministic.notes, ...notes].slice(0, 500),
     };
   }
@@ -130,6 +136,18 @@ export class AiderAdapter extends RemoteCodingAgentAdapter {
   constructor(options: Omit<RemoteCodingAgentAdapterOptions, "id">) {
     super({ ...options, id: "aider" });
   }
+}
+
+function mergeReviewDecisions(deterministic: PolicyDecision, remote: PolicyDecision): PolicyDecision {
+  const order: PolicyDecision["risk"][] = ["low", "medium", "high", "critical"];
+  return {
+    accepted: deterministic.accepted && remote.accepted,
+    risk: order.indexOf(deterministic.risk) >= order.indexOf(remote.risk) ? deterministic.risk : remote.risk,
+    codes: [...new Set([...deterministic.codes, ...remote.codes])],
+    reasons: [...new Set([...deterministic.reasons, ...remote.reasons])],
+    requiresHumanReview: true,
+    requiresExternalReviewer: deterministic.requiresExternalReviewer || remote.requiresExternalReviewer,
+  };
 }
 
 function validateBaseUrl(value: string): URL {
