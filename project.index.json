@@ -1,0 +1,26 @@
+{
+  "specId": "SPEC-005",
+  "apps": {
+    "web": "apps/web"
+  },
+  "services": {
+    "backend": "services/backend/src/personal_framework",
+    "mcp": "services/backend/src/personal_framework/mcp_server.py"
+  },
+  "docs": {
+    "source": "docs/source",
+    "importAudit": "docs/import"
+  },
+  "data": {
+    "development": "SQLite under APP_DATA_DIR",
+    "target": "Postgres/Supabase with object storage and pgvector"
+  },
+  "activeSpecs": [
+    "specs/active/SPEC-005-integrated-mvp.md"
+  ],
+  "commands": {
+    "dev": "./scripts/dev.sh",
+    "validate": "./scripts/validate.sh",
+    "mcp": "uv run personal-framework-mcp"
+  }
+}

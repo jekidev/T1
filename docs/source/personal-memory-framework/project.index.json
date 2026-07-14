@@ -1,0 +1,68 @@
+{
+  "name": "personal-memory-framework",
+  "description": "Mobile-first, GitHub-first, spec-driven personal AI memory/RAG framework",
+  "apps": [
+    { "name": "web", "path": "apps/web", "framework": "Next.js" }
+  ],
+  "packages": [
+    { "name": "core", "path": "packages/core" },
+    { "name": "rag", "path": "packages/rag" },
+    { "name": "transcription", "path": "packages/transcription" },
+    { "name": "storage", "path": "packages/storage" },
+    { "name": "db", "path": "packages/db" },
+    { "name": "shared", "path": "packages/shared" }
+  ],
+  "docs": [
+    "docs/INDEX.md", "docs/ARCHITECTURE.md", "docs/DATABASE.md", "docs/API.md",
+    "docs/RAG_PIPELINE.md", "docs/TRANSCRIPTION_PIPELINE.md", "docs/DEPLOYMENT.md",
+    "docs/GITHUB_WORKFLOW.md", "docs/DEVIN_WINDSURF_HANDOFF.md", "docs/MAINTENANCE_LOOP.md",
+    "docs/spec-kit/SPEC_GUIDE.md", "docs/spec-kit/SPEC_RULES.md", "docs/spec-kit/SPEC_CHECKLIST.md"
+  ],
+  "scripts": [
+    "dev", "build", "lint", "test", "typecheck", "db:migrate", "db:seed",
+    "ingest", "summarize", "index:update", "spec:new"
+  ],
+  "database_tables": [
+    "users", "recordings", "imports", "documents", "chunks", "tags",
+    "daily_summaries", "ai_conversations", "jobs", "audit_logs"
+  ],
+  "api_routes": [
+    "/api/recordings/create", "/api/recordings/transcribe", "/api/imports/upload",
+    "/api/rag/ingest", "/api/rag/search", "/api/chat", "/api/summaries/daily",
+    "/api/export", "/api/delete", "/api/specs/list", "/api/specs/create"
+  ],
+  "rag_pipeline": [
+    "ingest_source", "normalize_text", "chunk_text", "generate_embeddings",
+    "store_chunks", "search_similar_chunks", "return_citations", "generate_answer"
+  ],
+  "transcription_pipeline": [
+    "upload_audio", "store_file", "create_transcription_job",
+    "send_to_openai_speech_to_text", "save_transcript", "chunk_transcript",
+    "embed_chunks", "mark_job_completed_or_failed"
+  ],
+  "environment_variables": [
+    "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "DATABASE_URL",
+    "STORAGE_BUCKET_AUDIO", "STORAGE_BUCKET_IMPORTS", "APP_URL"
+  ],
+  "active_specs": [
+    "SPEC-001-mobile-recording", "SPEC-002-transcription-pipeline",
+    "SPEC-003-rag-ingestion", "SPEC-004-github-maintenance-loop"
+  ],
+  "completed_specs": [],
+  "todos": [
+    "Wire Supabase project and run schema migration",
+    "Implement /api/recordings/transcribe against OpenAI speech-to-text",
+    "Implement RAG ingest + search against pgvector",
+    "Build mobile recording page with MediaRecorder API",
+    "Add RLS policies for all tables"
+  ],
+  "owners": ["@owner"],
+  "next_actions": [
+    "Provision Supabase project and add credentials to .env.local",
+    "Implement SPEC-001 mobile recording page end-to-end",
+    "Implement SPEC-002 transcription pipeline end-to-end",
+    "Implement SPEC-003 RAG ingestion end-to-end",
+    "Push repo to GitHub and enable Actions"
+  ]
+}
