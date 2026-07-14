@@ -1,12 +1,6 @@
 import { nanoid } from "nanoid";
-import type { BoardState, FactionState, SimulationState, TimelineEvent } from "./types";
-
-export interface PlayerTurnAction {
-  type: "invest" | "gather_intelligence" | "reduce_pressure" | "expand_influence" | "train" | "wait";
-  factionId?: string;
-  skillId?: string;
-  amount?: number;
-}
+import type { BoardState, FactionState, PlayerTurnAction, SimulationState, TimelineEvent } from "./types";
+import { applyPlayerTurnToTeamDynamics, ensureTeamDynamics } from "./teamPulse";
 
 export interface TurnResolution {
   board: BoardState;
@@ -40,6 +34,7 @@ function updateFaction(faction: FactionState, action: PlayerTurnAction | undefin
     if (action.type === "gather_intelligence") { treasury -= amount * 500; intelligence += 5; suspicion += 2; }
     if (action.type === "reduce_pressure") { treasury -= amount * 750; suspicion -= 5; legitimacy += 2; }
     if (action.type === "expand_influence") { treasury -= amount * 900; legitimacy += faction.faction === "criminal" ? -1 : 2; suspicion += faction.faction === "criminal" ? 4 : 1; }
+    if (action.type === "train") cohesion += 2;
   }
 
   const upkeep = faction.personnel * 120;
@@ -62,6 +57,10 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
   const current = board.simulation;
   if (!current) return { board, summary: "Simulation state is not initialized.", events: [] };
 
+  const currentWithDynamics: SimulationState = {
+    ...current,
+    teamDynamics: ensureTeamDynamics(current),
+  };
   let seed = current.seed + current.turn + 1;
   const randomValues: number[] = [];
   for (let index = 0; index < Math.max(4, current.factions.length); index += 1) {
@@ -78,8 +77,8 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
   const mediaChange = current.cityTension > 55 ? 3 : randomValues[2]! > 0.85 ? 2 : -1;
   const publicChange = -Math.max(0, tensionChange) * 0.5 + (randomValues[3]! > 0.75 ? 1 : 0);
 
-  const next: SimulationState = {
-    ...current,
+  const nextBase: SimulationState = {
+    ...currentWithDynamics,
     seed,
     turn: current.turn + 1,
     day: current.day + (current.hour >= 20 ? 1 : 0),
@@ -92,14 +91,20 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
     cityTension: clamp(current.cityTension + tensionChange),
     economyIndex: clamp(current.economyIndex + (randomValues[0]! - 0.5) * 2, 60, 140),
   };
+  const next: SimulationState = {
+    ...nextBase,
+    teamDynamics: applyPlayerTurnToTeamDynamics(currentWithDynamics, nextBase, action),
+  };
 
-  const summary = `Turn ${next.turn}: city tension ${next.cityTension}, evidence ${next.evidenceQuality}, public confidence ${next.publicConfidence}, media pressure ${next.mediaPressure}.`;
+  const red = next.teamDynamics.red;
+  const blue = next.teamDynamics.blue;
+  const summary = `Turn ${next.turn}: Red ${red.estimatedSuccess.toFixed(1)}% / Blue ${blue.estimatedSuccess.toFixed(1)}% estimated success; morale ${red.collectiveMorale.toFixed(1)} / ${blue.collectiveMorale.toFixed(1)}; confidence ${red.confidence.toFixed(1)}%.`;
   next.lastResolution = summary;
   const event: TimelineEvent = {
     id: nanoid(10),
     phaseId: board.currentPhaseId,
     label: `Turn ${next.turn} resolved`,
-    description: summary,
+    description: `${summary} City tension ${next.cityTension}, evidence ${next.evidenceQuality}, public confidence ${next.publicConfidence}.`,
     severity: next.cityTension >= 70 ? "critical" : next.cityTension >= 45 ? "caution" : "info",
     createdAt: new Date().toISOString(),
     sourceStatus: "balance",
