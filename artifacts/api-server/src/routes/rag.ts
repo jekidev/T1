@@ -1,8 +1,16 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
+import { z } from "zod";
 import { listRagMemory, syncRagIntoPersistentMemory } from "../lib/rag-memory";
+import {
+  calculateRagRevision,
+  importArtOfWar,
+  importHuggingFaceTextFiles,
+  isNetworkApprovalRequired,
+  type NetworkSessionCredentials,
+} from "../lib/rag-imports";
 
 const router: IRouter = Router();
 const notesDir = path.resolve(process.cwd(), "rag/notes");
@@ -16,7 +24,42 @@ router.get("/rag/memory", async (_req, res): Promise<void> => {
 });
 
 router.post("/rag/sync", async (_req, res): Promise<void> => {
-  res.json(await syncRagIntoPersistentMemory());
+  const sync = await syncRagIntoPersistentMemory();
+  res.json({ ...sync, ragRevision: await calculateRagRevision() });
+});
+
+router.post("/rag/update-world", async (_req, res): Promise<void> => {
+  const sync = await syncRagIntoPersistentMemory();
+  const items = await listRagMemory();
+  res.json({
+    ...sync,
+    ragRevision: await calculateRagRevision(),
+    itemCount: items.length,
+    message: "Persistent RAG was rebuilt. NPCs should store this revision and retrieve only role-relevant context on their next deterministic update.",
+  });
+});
+
+router.post("/rag/import/art-of-war", async (req, res): Promise<void> => {
+  try {
+    const body = z.object({ accountName: z.string().min(1).max(100) }).parse(req.body);
+    res.status(201).json(await importArtOfWar({ accountName: body.accountName, network: networkCredentials(req) }));
+  } catch (error) {
+    sendImportError(res, error);
+  }
+});
+
+router.post("/rag/import/huggingface", async (req, res): Promise<void> => {
+  try {
+    const body = z.object({
+      accountName: z.string().min(1).max(100),
+      repoId: z.string().min(3).max(240),
+      revision: z.string().min(1).max(160).default("main"),
+      files: z.array(z.string().min(1).max(500)).min(1).max(20),
+    }).parse(req.body);
+    res.status(201).json(await importHuggingFaceTextFiles({ ...body, network: networkCredentials(req) }));
+  } catch (error) {
+    sendImportError(res, error);
+  }
 });
 
 router.post("/rag/notes", async (req, res): Promise<void> => {
@@ -56,7 +99,32 @@ router.post("/rag/notes", async (req, res): Promise<void> => {
   const notePath = path.join(notesDir, `${base}.md`);
   await fs.writeFile(notePath, metadata.join("\n"), "utf8");
   const sync = await syncRagIntoPersistentMemory();
-  res.status(201).json({ id, notePath: path.relative(process.cwd(), notePath), imagePath: imagePath ? path.relative(process.cwd(), imagePath) : null, sync });
+  res.status(201).json({ id, notePath: path.relative(process.cwd(), notePath), imagePath: imagePath ? path.relative(process.cwd(), imagePath) : null, sync, ragRevision: await calculateRagRevision() });
 });
+
+function networkCredentials(req: Request): NetworkSessionCredentials {
+  const sessionHeader = req.headers["x-network-session-id"];
+  const tokenHeader = req.headers["x-network-session-token"];
+  const sessionId = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+  const token = Array.isArray(tokenHeader) ? tokenHeader[0] : tokenHeader;
+  if (!sessionId || !token) throw new Error("X-Network-Session-Id and X-Network-Session-Token are required for internet imports.");
+  return { sessionId, token };
+}
+
+function sendImportError(res: Parameters<IRouter["post"]>[1] extends never ? never : any, error: unknown): void {
+  if (isNetworkApprovalRequired(error)) {
+    res.status(409).json({
+      error: error.message,
+      code: "network_approval_required",
+      approval: error.approval,
+    });
+    return;
+  }
+  if (error instanceof z.ZodError) {
+    res.status(400).json({ error: "Validation failed.", issues: error.issues.map(issue => ({ path: issue.path.join("."), message: issue.message })) });
+    return;
+  }
+  res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+}
 
 export default router;
