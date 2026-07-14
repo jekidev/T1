@@ -6,6 +6,7 @@ import {
   type PolicyDecision,
   type RepositoryMap,
 } from "./types";
+import { resolveAgentNetworkPolicy } from "./networkPolicy";
 
 export const DEFAULT_PROTECTED_PATHS = [
   ".env",
@@ -74,7 +75,34 @@ export function evaluateTaskPolicy(taskInput: AgentTask, mapInput: RepositoryMap
     reasons.push("The task has a valid concrete self-improvement signal from the user.");
   }
 
-  const accepted = !codes.some(code => code === "paths.protected_requested" || code === "branch.direct_write_forbidden");
+  const network = resolveAgentNetworkPolicy(task.labels);
+  if (network.mode === "ask_first") {
+    codes.push("network.ask_first");
+    reasons.push(network.approvedDomains.length > 0
+      ? `Internet access is limited to explicitly approved domains: ${network.approvedDomains.join(", ")}.`
+      : "Internet access is blocked except for the configured model provider. Add an approved domain only after the user confirms it.");
+  } else if (network.mode === "offline") {
+    codes.push("network.offline");
+    reasons.push("Agent tools have no external network access; only the model transport may be available through the isolated provider bridge.");
+  } else {
+    codes.push("network.ultra_confirmed");
+    reasons.push("The user explicitly selected Ultra, granting the agent unrestricted internet access for this isolated run.");
+    risk = maxRisk(risk, "high");
+  }
+
+  const contradictoryModes = ["network-offline", "network-ask-first", "network-ultra-confirmed"]
+    .filter(label => task.labels.includes(label));
+  if (contradictoryModes.length > 1) {
+    codes.push("network.conflicting_modes");
+    reasons.push(`Task includes conflicting network modes: ${contradictoryModes.join(", ")}`);
+    risk = "critical";
+  }
+
+  const accepted = !codes.some(code => [
+    "paths.protected_requested",
+    "branch.direct_write_forbidden",
+    "network.conflicting_modes",
+  ].includes(code));
   return {
     accepted,
     risk,
@@ -130,6 +158,13 @@ export function evaluatePatchPaths(taskInput: AgentTask, mapInput: RepositoryMap
     codes.push("patch.dependencies_changed");
     reasons.push("Dependency changes require license, maintenance, vulnerability and bundle-impact review.");
     risk = maxRisk(risk, "medium");
+  }
+
+  const network = resolveAgentNetworkPolicy(task.labels);
+  if (network.mode === "ultra") {
+    codes.push("patch.network_ultra_run");
+    reasons.push("This patch was generated in an Ultra network run and requires explicit human review of fetched sources and dependencies.");
+    risk = maxRisk(risk, "high");
   }
 
   return {
