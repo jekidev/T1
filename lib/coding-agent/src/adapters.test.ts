@@ -32,6 +32,7 @@ const task: AgentTask = {
   allowedPaths: ["lib/example/"],
   labels: [],
   createPullRequest: true,
+  networkPolicy: { mode: "ask_first", approvedHosts: [], approvedCapabilities: [] },
   limits: { maxIterations: 5, maxCommands: 20, maxFilesChanged: 5, maxPatchLines: 100, maxRuntimeMinutes: 10, maxModelTokens: 20000, maxCost: 5 },
 };
 const plan: CodingTaskPlan = {
@@ -53,6 +54,24 @@ const patch: AgentPatch = {
   diff: "+test('ok', () => {});",
   explanation: "Add a test",
 };
+const networkAudit = {
+  mode: "deny" as const,
+  enforcement: "sandbox_firewall" as const,
+  requests: [],
+  privateNetworkBlocked: true,
+  metadataEndpointsBlocked: true,
+  redirectsRevalidated: true,
+};
+const networkAuthorization = {
+  mode: "deny" as const,
+  allowedHosts: [],
+  allowedCapabilities: [],
+  requireHttps: true as const,
+  blockPrivateNetworks: true as const,
+  rejectRedirectsUntilRevalidated: true as const,
+  auditRequired: true as const,
+  expiresAt: new Date(Date.now() + 60_000).toISOString(),
+};
 const run: AgentRun = {
   id: "agent-run-review-test",
   task,
@@ -67,6 +86,7 @@ const run: AgentRun = {
   policyDecision: { accepted: true, risk: "low", codes: [], reasons: [], requiresHumanReview: true, requiresExternalReviewer: false },
   commands: [],
   tests: [],
+  networkAudit,
   auditEvents: [],
 };
 
@@ -100,13 +120,27 @@ void test("execute rejects a sandbox that publishes before validation", async ()
     patch,
     commands: [],
     tests: [],
+    networkAudit,
     pullRequestUrl: "https://github.com/example/repo/pull/1",
   }), { status: 200, headers: { "content-type": "application/json" } });
   try {
     const adapter = new OpenHandsAdapter({ baseUrl: "http://localhost:8080/", token });
     await assert.rejects(
-      () => adapter.executeTask({ run, repositoryMap: map, plan }),
+      () => adapter.executeTask({ run, repositoryMap: map, plan, networkAuthorization }),
       /publishing before deterministic patch validation/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+void test("execute requires a schema-valid sandbox firewall audit", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ patch, commands: [], tests: [] }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const adapter = new OpenHandsAdapter({ baseUrl: "http://localhost:8080/", token });
+    await assert.rejects(
+      () => adapter.executeTask({ run, repositoryMap: map, plan, networkAuthorization }),
     );
   } finally {
     globalThis.fetch = original;
