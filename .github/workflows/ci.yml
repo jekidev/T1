@@ -41,10 +41,13 @@ jobs:
             pnpm install --no-frozen-lockfile
           fi
 
+      - name: Validate asset worker syntax
+        run: python3 -m py_compile services/asset-worker/worker.py
+
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Strategy and board integration tests
+      - name: Strategy asset and board integration tests
         run: pnpm test:integration
 
       - name: Build
