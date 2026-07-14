@@ -17,6 +17,7 @@ export * from "./npc/types";
 export * from "./scenarios/createHeadlessScenario";
 export * from "./status/CharacterStatus";
 export * from "./syndicate/commands";
+export * from "./syndicate/danishPreset";
 export * from "./syndicate/SyndicateSystem";
 export * from "./syndicate/types";
 export * from "./systems/types";
