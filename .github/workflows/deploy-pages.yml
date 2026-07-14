@@ -1,0 +1,74 @@
+name: Deploy Urban Strategy Simulator to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify integrated archive
+        run: test -f uploads/Urban-Strategy-Simulator-integrated.zip
+
+      - name: Extract project
+        run: |
+          mkdir project
+          unzip -q uploads/Urban-Strategy-Simulator-integrated.zip -d project
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: project/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: project
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: project
+        env:
+          PORT: 4173
+          BASE_PATH: /T1/
+        run: pnpm --filter @workspace/command-sim build
+
+      - name: Prepare Pages artifact
+        run: |
+          cp project/artifacts/command-sim/dist/public/index.html project/artifacts/command-sim/dist/public/404.html
+          mkdir -p project/artifacts/command-sim/dist/public/rag
+          cp -R project/rag/HackerAI_documents project/artifacts/command-sim/dist/public/rag/
+          touch project/artifacts/command-sim/dist/public/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: project/artifacts/command-sim/dist/public
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
