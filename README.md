@@ -1,29 +1,54 @@
 # T1 — Urban Strategy Simulator
 
-Repository target for the Urban Strategy Simulator and HackerAI RAG documents.
+Canonical repository for the Urban Strategy Simulator.
 
-## Expected project archive
+## Use with Replit
 
-Upload the integrated project archive at:
+Import this repository directly:
 
-`uploads/Urban-Strategy-Simulator-integrated.zip`
+```text
+https://github.com/jekidev/T1
+```
 
-The archive already contains the HackerAI documents under:
+Build:
 
-`rag/HackerAI_documents/`
+```bash
+pnpm install --frozen-lockfile && pnpm rag:sync && pnpm build
+```
 
-## GitHub Pages
+Run:
 
-A Pages workflow is configured in `.github/workflows/deploy-pages.yml`.
+```bash
+NODE_ENV=production pnpm start
+```
 
-When the integrated archive exists on `main`, the workflow will:
+Add `OPENROUTER_API_KEY` and other credentials through Replit Secrets.
 
-1. Extract the project.
-2. Install dependencies with pnpm.
-3. Build `@workspace/command-sim` with base path `/T1/`.
-4. Copy HackerAI RAG documents into the published Pages artifact.
-5. Deploy to `https://jekidev.github.io/T1/`.
+## Use with Manus
 
-## Hosting limitation
+Give Manus the repository URL and instruct it to preserve the existing pnpm workspace, Express API, command-sim frontend, Google Drive RAG flow, and deployment files.
 
-GitHub Pages hosts static frontend files only. The API server and live LLM advisor require a separate backend host; they cannot execute inside GitHub Pages.
+## Google Drive RAG
+
+Set `GOOGLE_DRIVE_RAG_PATH` to a local folder containing files downloaded or synced from Google Drive, then run:
+
+```bash
+pnpm rag:sync
+```
+
+The script copies supported documents into `rag/inbox`, removes duplicates by SHA-256, and writes `rag/inbox/manifest.json`.
+
+## Local / Termux
+
+```bash
+git clone https://github.com/jekidev/T1.git
+cd T1
+corepack enable
+corepack prepare pnpm@10.13.1 --activate
+cp .env.example .env
+pnpm install --frozen-lockfile
+pnpm rag:sync
+pnpm dev
+```
+
+See `DEPLOYMENT.md` for the complete setup.
