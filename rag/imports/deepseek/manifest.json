@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "policy": {
+    "preserveOriginals": true,
+    "overwriteOriginals": false,
+    "deleteOriginalsWithoutExplicitDecision": false,
+    "canonicalizeInSeparateFiles": true,
+    "indexOriginalsForSearch": true,
+    "runtimeAuthority": false
+  },
+  "expectedOriginals": [
+    {
+      "filename": "Nyx Response - DeepSeek.pdf",
+      "status": "expected-upload",
+      "storagePath": "rag/imports/deepseek/original/Nyx Response - DeepSeek.pdf",
+      "sha256": null
+    },
+    {
+      "filename": "Nyx klar - DeepSeek.pdf",
+      "status": "expected-upload",
+      "storagePath": "rag/imports/deepseek/original/Nyx klar - DeepSeek.pdf",
+      "sha256": null
+    }
+  ],
+  "derivedLocations": {
+    "extracted": "rag/imports/deepseek/extracted/",
+    "reviewed": "rag/imports/deepseek/reviewed/",
+    "storyline": "rag/storyline/"
+  }
+}
