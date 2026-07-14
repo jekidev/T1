@@ -1,3 +1,6 @@
+import { BlackmailService } from "./blackmail/BlackmailService";
+import { BlackmailSystem } from "./blackmail/BlackmailSystem";
+import type { BlackmailConfig } from "./blackmail/config";
 import { CommandQueue } from "./commands/CommandQueue";
 import type { CommandEnvelope, CommandValidationResult } from "./commands/types";
 import { DeterministicRandom } from "./core/DeterministicRandom";
@@ -21,6 +24,7 @@ export interface StrategySimulationOptions {
   seed?: number;
   tickRate?: number;
   localStrategyDecisionIntervalTicks?: number;
+  blackmail?: Partial<BlackmailConfig>;
 }
 
 export interface StrategySimulationSnapshot {
@@ -53,6 +57,8 @@ export class StrategySimulation {
   readonly commands = new CommandQueue();
   readonly submittedCommands: CommandEnvelope[] = [];
   readonly subsystemStatus: StrategySubsystemStatus[];
+  readonly blackmailConfig: Readonly<BlackmailConfig>;
+  readonly blackmail: BlackmailService;
 
   private readonly systems: SimulationSystem[];
   private scheduledTickAccumulator = 0;
@@ -67,13 +73,16 @@ export class StrategySimulation {
     this.random = new DeterministicRandom(options.seed ?? 1);
 
     const tactical = new DisabledExtensionSystem("tactical-intent", "Mistreevous is deferred until Phase C.");
+    const blackmailSystem = new BlackmailSystem(options.blackmail);
     const path = new DisabledExtensionSystem("path-intent", "Recast Navigation JS is deferred until Phase B.");
     const collision = new DisabledExtensionSystem("collision-avoidance", "Rapier strategy collision integration is deferred until the navigation contract exists.");
 
+    this.blackmailConfig = blackmailSystem.config;
     this.systems = [
       new CommandSystem(),
       new LocalStrategySystem(localStrategyInterval),
       tactical,
+      blackmailSystem,
       path,
       new MovementSystem(),
       collision,
@@ -96,6 +105,7 @@ export class StrategySimulation {
       }
       return { id: system.id, enabled: true };
     });
+    this.blackmail = new BlackmailService(this);
   }
 
   addEntity(entity: StrategyEntity): StrategyEntity {
