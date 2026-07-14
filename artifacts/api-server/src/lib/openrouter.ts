@@ -3,6 +3,14 @@ import { recordObservabilityEvent } from "./observability";
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 const RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429]);
 
+export const DEFAULT_ROTATION_MODELS = [
+  "nvidia/nemotron-nano-9b-v2:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "mistralai/mistral-nemo",
+] as const;
+
+export type LlmRoutingMode = "rotate" | "static" | "off";
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -34,7 +42,11 @@ interface RouteAttempt {
 
 export interface LlmRouterStatus {
   configured: boolean;
+  mode: LlmRoutingMode;
+  enabled: boolean;
   keyCount: number;
+  activeModels: string[];
+  staticModel: string;
   configuredModels: string[];
   cachedDiscoveredModels: string[];
   cooldownRoutes: number;
@@ -70,6 +82,15 @@ function envBoolean(name: string, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
+function routingMode(): LlmRoutingMode {
+  const value = (process.env.LLM_ROUTING_MODE ?? "rotate").trim().toLowerCase();
+  return value === "static" || value === "off" ? value : "rotate";
+}
+
+function staticModel(): string {
+  return process.env.LLM_STATIC_MODEL?.trim() || DEFAULT_ROTATION_MODELS[0];
+}
+
 function apiKeys(): string[] {
   const keys = csv("OPENROUTER_API_KEYS");
   const single = process.env.OPENROUTER_API_KEY?.trim();
@@ -100,8 +121,16 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 }
 
 async function discoverModels(keys: string[]): Promise<string[]> {
+  const mode = routingMode();
+  if (mode === "off") return [];
+  if (mode === "static") return [staticModel()];
+
   const configured = csv("OPENROUTER_MODELS");
   if (configured.length > 0) return configured;
+
+  if (!envBoolean("OPENROUTER_AUTO_DISCOVER", false)) {
+    return [...DEFAULT_ROTATION_MODELS];
+  }
 
   const cacheMs = envNumber("OPENROUTER_MODEL_CACHE_MS", 15 * 60 * 1000);
   if (discoveredModels.length > 0 && Date.now() - discoveredAt < cacheMs) return discoveredModels;
@@ -140,13 +169,26 @@ function cleanCooldowns() {
   for (const [route, until] of cooldowns) if (until <= now) cooldowns.delete(route);
 }
 
+function activeModelsForStatus(): string[] {
+  const mode = routingMode();
+  if (mode === "off") return [];
+  if (mode === "static") return [staticModel()];
+  const configured = csv("OPENROUTER_MODELS");
+  return configured.length > 0 ? configured : [...DEFAULT_ROTATION_MODELS];
+}
+
 export function getLlmRouterStatus(): LlmRouterStatus {
   cleanCooldowns();
   const configuredKeys = csv("OPENROUTER_API_KEYS");
   if (process.env.OPENROUTER_API_KEY?.trim()) configuredKeys.push(process.env.OPENROUTER_API_KEY.trim());
+  const mode = routingMode();
   return {
     configured: configuredKeys.length > 0,
+    mode,
+    enabled: mode !== "off",
     keyCount: new Set(configuredKeys).size,
+    activeModels: activeModelsForStatus(),
+    staticModel: staticModel(),
     configuredModels: csv("OPENROUTER_MODELS"),
     cachedDiscoveredModels: discoveredModels,
     cooldownRoutes: cooldowns.size,
@@ -157,9 +199,21 @@ export function getLlmRouterStatus(): LlmRouterStatus {
 }
 
 export async function chatWithOpenRouter(messages: ChatMessage[]): Promise<string> {
+  const mode = routingMode();
+  if (mode === "off") {
+    recordObservabilityEvent({
+      source: "system",
+      level: "info",
+      type: "llm.disabled",
+      message: "External LLM routing is disabled; local fallback will be used",
+      data: { mode },
+    });
+    throw new Error("External LLM routing is disabled");
+  }
+
   const keys = apiKeys();
   const models = await discoverModels(keys);
-  const orderedModels = ordered(models, modelIndex);
+  const orderedModels = mode === "static" ? models : ordered(models, modelIndex);
   const orderedKeys = ordered(keys, keyIndex);
   const attempts: RouteAttempt[] = [];
   const baseUrl = (process.env.OPENROUTER_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
@@ -209,7 +263,7 @@ export async function chatWithOpenRouter(messages: ChatMessage[]): Promise<strin
           const content = data.choices?.[0]?.message?.content?.trim();
           if (!content) throw new Error("OpenRouter response did not include content");
 
-          modelIndex = (models.indexOf(model) + 1) % models.length;
+          if (mode === "rotate") modelIndex = (models.indexOf(model) + 1) % models.length;
           keyIndex = (keys.indexOf(key) + 1) % keys.length;
           lastSuccessfulModel = data.model ?? model;
           lastSuccessAt = new Date().toISOString();
@@ -219,7 +273,7 @@ export async function chatWithOpenRouter(messages: ChatMessage[]): Promise<strin
             level: "info",
             type: "llm.route.success",
             message: `LLM request succeeded with ${lastSuccessfulModel}`,
-            data: { model: lastSuccessfulModel, keyIndex: keys.indexOf(key), retry, usage: data.usage ?? {} },
+            data: { mode, model: lastSuccessfulModel, keyIndex: keys.indexOf(key), retry, usage: data.usage ?? {} },
           });
 
           return content;
@@ -240,7 +294,7 @@ export async function chatWithOpenRouter(messages: ChatMessage[]): Promise<strin
         level: "warn",
         type: "llm.route.cooldown",
         message: `LLM route placed on cooldown for ${model}`,
-        data: { model, keyIndex: keys.indexOf(key), cooldownMs },
+        data: { mode, model, keyIndex: keys.indexOf(key), cooldownMs },
       });
     }
   }
@@ -251,7 +305,7 @@ export async function chatWithOpenRouter(messages: ChatMessage[]): Promise<strin
     level: "error",
     type: "llm.all_routes_failed",
     message: "All configured OpenRouter routes failed",
-    data: { attempts: attempts.slice(-12) },
+    data: { mode, attempts: attempts.slice(-12) },
   });
 
   const summary = attempts.slice(-8).map((attempt) => `${attempt.model}[key ${attempt.keyIndex}] ${attempt.status ?? "network"}: ${attempt.error}`).join(" | ");
