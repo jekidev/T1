@@ -6,7 +6,7 @@ import {
   type PolicyDecision,
   type RepositoryMap,
 } from "./types";
-import { resolveAgentNetworkPolicy } from "./networkPolicy";
+import { evaluateAgentNetworkPolicy } from "./networkPolicy";
 
 export const DEFAULT_PROTECTED_PATHS = [
   ".env",
@@ -35,6 +35,7 @@ export const SELF_MODIFICATION_PATHS = [
 
 export const POLICY_VALIDATOR_PATHS = [
   "lib/coding-agent/src/policy.ts",
+  "lib/coding-agent/src/networkPolicy.ts",
   "lib/coding-agent/src/patchValidator.ts",
   "src/coding-agent/validation/PolicyValidator.ts",
 ] as const;
@@ -64,7 +65,8 @@ export function evaluateTaskPolicy(taskInput: AgentTask, mapInput: RepositoryMap
     risk = "critical";
   }
 
-  if (task.allowedPaths.some(path => SELF_MODIFICATION_PATHS.some(prefix => normalizeRepoPath(path).startsWith(prefix)))) {
+  const selfModification = task.allowedPaths.some(path => SELF_MODIFICATION_PATHS.some(prefix => normalizeRepoPath(path).startsWith(prefix)));
+  if (selfModification) {
     codes.push("self_modification.review_required");
     reasons.push("Coding-agent source modifications require an external reviewer and cannot auto-merge.");
     risk = maxRisk(risk, "high");
@@ -75,41 +77,22 @@ export function evaluateTaskPolicy(taskInput: AgentTask, mapInput: RepositoryMap
     reasons.push("The task has a valid concrete self-improvement signal from the user.");
   }
 
-  const network = resolveAgentNetworkPolicy(task.labels);
-  if (network.mode === "ask_first") {
-    codes.push("network.ask_first");
-    reasons.push(network.approvedDomains.length > 0
-      ? `Internet access is limited to explicitly approved domains: ${network.approvedDomains.join(", ")}.`
-      : "Internet access is blocked except for the configured model provider. Add an approved domain only after the user confirms it.");
-  } else if (network.mode === "offline") {
-    codes.push("network.offline");
-    reasons.push("Agent tools have no external network access; only the model transport may be available through the isolated provider bridge.");
-  } else {
-    codes.push("network.ultra_confirmed");
-    reasons.push("The user explicitly selected Ultra, granting the agent unrestricted internet access for this isolated run.");
-    risk = maxRisk(risk, "high");
-  }
+  const networkDecision = evaluateAgentNetworkPolicy(task);
+  codes.push(...networkDecision.codes);
+  reasons.push(...networkDecision.reasons);
+  risk = maxRisk(risk, networkDecision.risk);
 
-  const contradictoryModes = ["network-offline", "network-ask-first", "network-ultra-confirmed"]
-    .filter(label => task.labels.includes(label));
-  if (contradictoryModes.length > 1) {
-    codes.push("network.conflicting_modes");
-    reasons.push(`Task includes conflicting network modes: ${contradictoryModes.join(", ")}`);
-    risk = "critical";
-  }
-
-  const accepted = !codes.some(code => [
+  const accepted = networkDecision.accepted && !codes.some(code => [
     "paths.protected_requested",
     "branch.direct_write_forbidden",
-    "network.conflicting_modes",
   ].includes(code));
   return {
     accepted,
     risk,
-    codes,
-    reasons,
+    codes: [...new Set(codes)],
+    reasons: [...new Set(reasons)],
     requiresHumanReview: true,
-    requiresExternalReviewer: task.allowedPaths.some(path => SELF_MODIFICATION_PATHS.some(prefix => normalizeRepoPath(path).startsWith(prefix))),
+    requiresExternalReviewer: selfModification || networkDecision.requiresExternalReviewer,
   };
 }
 
@@ -160,8 +143,7 @@ export function evaluatePatchPaths(taskInput: AgentTask, mapInput: RepositoryMap
     risk = maxRisk(risk, "medium");
   }
 
-  const network = resolveAgentNetworkPolicy(task.labels);
-  if (network.mode === "ultra") {
+  if (task.networkPolicy.mode === "ultra") {
     codes.push("patch.network_ultra_run");
     reasons.push("This patch was generated in an Ultra network run and requires explicit human review of fetched sources and dependencies.");
     risk = maxRisk(risk, "high");
@@ -178,7 +160,7 @@ export function evaluatePatchPaths(taskInput: AgentTask, mapInput: RepositoryMap
     codes,
     reasons,
     requiresHumanReview: true,
-    requiresExternalReviewer: selfModificationFiles.length > 0,
+    requiresExternalReviewer: selfModificationFiles.length > 0 || task.networkPolicy.mode === "ultra",
   };
 }
 
