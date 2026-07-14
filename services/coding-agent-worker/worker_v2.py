@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Network-gated entrypoint for the coding-agent worker.
 
-This module reuses the worker's Git/policy implementation while replacing network
-handling. The worker container must be attached only to an internal Docker network;
-`network_gate.py` is the sole dual-homed egress service.
+The API sends a run-bound authorization. This module writes that authorization to the
+shared policy volume, gives the provider a per-run proxy credential, and returns the
+firewall audit required by the deterministic TypeScript validator. The worker must be
+attached only to the internal Docker network defined in docker-compose.yml.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 import secrets
@@ -21,107 +21,82 @@ from typing import Any
 import worker as base
 
 POLICY_ROOT = Path(os.getenv("NETWORK_GATE_POLICY_ROOT", "/network-policies")).resolve()
+AUDIT_ROOT = POLICY_ROOT / "audit"
+PENDING_ROOT = POLICY_ROOT / "pending"
 PROXY_HOST = os.getenv("NETWORK_GATE_PROXY_HOST", "network-gate")
 PROXY_PORT = int(os.getenv("NETWORK_GATE_PROXY_PORT", "8888"))
 INFRA_TOKEN = os.getenv("NETWORK_GATE_INFRA_TOKEN", "")
-POLICY_TTL_SECONDS = int(os.getenv("NETWORK_GATE_POLICY_TTL_SECONDS", str(2 * 60 * 60)))
 _thread_state = threading.local()
 _original_execute = base.execute
 _original_review = base.review_patch
 _original_build_prompt = base.build_provider_prompt
-_original_validation_environment = base.validation_environment
 
-
-def network_mode(task: dict[str, Any]) -> str:
-    labels = set(base.require_string_list(task, "labels", minimum=0))
-    modes = {
-        "offline": "network-offline" in labels,
-        "ask_first": "network-ask-first" in labels,
-        "ultra": "network-ultra-confirmed" in labels,
-    }
-    selected = [name for name, active in modes.items() if active]
-    if len(selected) > 1:
-        raise base.WorkerError(f"Conflicting network modes: {', '.join(selected)}")
-    return selected[0] if selected else "ask_first"
-
-
-def approved_domains(task: dict[str, Any]) -> list[str]:
-    output: list[str] = []
-    for label in base.require_string_list(task, "labels", minimum=0):
-        if not label.startswith("network-domain:"):
-            continue
-        domain = normalize_domain(label.split(":", 1)[1])
-        if domain and domain not in output:
-            output.append(domain)
-    return sorted(output)
-
-
-def model_domains() -> list[str]:
-    raw = os.getenv(
-        "NETWORK_GATE_MODEL_DOMAINS",
-        "openrouter.ai,api.openai.com,api.anthropic.com,api.deepseek.com,generativelanguage.googleapis.com",
-    )
-    return sorted({domain for value in raw.split(",") if (domain := normalize_domain(value))})
+ALLOWED_CAPABILITIES = {
+    "web_search",
+    "web_fetch",
+    "package_registry",
+    "source_docs",
+    "issue_tracker",
+}
 
 
 def execute(provider: str, payload: dict[str, Any]) -> dict[str, Any]:
     context = base.parse_run_context(provider, payload)
-    mode = network_mode(context.task)
+    authorization = validate_authorization(base.require_dict(payload, "networkAuthorization"))
     nonce = secrets.token_urlsafe(32)
-    write_policy(context.run_id, mode, approved_domains(context.task), nonce)
+    clear_run_network_records(context.run_id)
+    write_policy(context.run_id, authorization, nonce)
     _thread_state.context = context
     _thread_state.network_nonce = nonce
+    _thread_state.network_authorization = authorization
     try:
         result = _original_execute(provider, payload)
-        result["networkPolicy"] = {
-            "mode": mode,
-            "approvedDomains": approved_domains(context.task),
-            "deniedRequests": list_denied_requests(context.run_id),
-        }
+        result["networkAudit"] = collect_network_audit(context.run_id, authorization)
         return result
     finally:
         _thread_state.context = None
         _thread_state.network_nonce = None
+        _thread_state.network_authorization = None
 
 
 def review_patch(payload: dict[str, Any]) -> dict[str, Any]:
     result = _original_review(payload)
     task = base.require_dict(payload, "task")
-    mode = network_mode(task)
+    network_policy = task.get("networkPolicy", {})
+    mode = str(network_policy.get("mode", "ask_first")) if isinstance(network_policy, dict) else "ask_first"
     decision = result.get("decision")
     if isinstance(decision, dict):
         codes = decision.setdefault("codes", [])
         reasons = decision.setdefault("reasons", [])
         if mode == "ultra":
             codes.append("review.network_ultra")
-            reasons.append("The user explicitly selected Ultra. Review fetched sources, licenses and dependency changes before merge.")
+            reasons.append("The user explicitly approved Ultra. Review fetched sources, licenses and dependency changes before merge.")
             decision["risk"] = max_risk(str(decision.get("risk", "low")), "high")
-        elif mode == "ask_first":
-            codes.append("review.network_ask_first")
-            reasons.append("Only model transport and user-approved domains were available to the agent.")
+            decision["requiresExternalReviewer"] = True
         else:
-            codes.append("review.network_offline")
-            reasons.append("Agent web access was disabled for this run.")
+            codes.append("review.network_ask_first")
+            reasons.append("Agent egress was deny-all or restricted to the exact Ask First hosts and capabilities encoded in the run.")
     notes = result.setdefault("notes", [])
-    notes.append(f"Network mode: {mode}.")
-    denied = list_denied_requests(base.require_string(base.require_dict(payload, "patch"), "runId"))
-    if denied:
-        notes.append(f"Denied network requests: {', '.join(item['domain'] for item in denied[:20])}.")
+    notes.append(f"Network policy requested by task: {mode}.")
     return result
 
 
 def build_provider_prompt(context: base.RunContext) -> str:
-    mode = network_mode(context.task)
-    domains = approved_domains(context.task)
-    policy_text = {
-        "offline": "Web browsing and arbitrary network calls are disabled. Do not attempt them.",
-        "ask_first": (
-            "Web browsing is blocked unless the user approved the exact domain before this run. "
-            f"Approved domains: {', '.join(domains) if domains else 'none'}. If another domain is needed, stop and report it; do not bypass the gate."
-        ),
-        "ultra": "The user explicitly selected Ultra for this isolated run, so web access is pre-approved. Record sources and licenses in the patch explanation.",
-    }[mode]
-    return _original_build_prompt(context) + "\n\n## Enforced network policy\n- " + policy_text + "\n"
+    authorization = getattr(_thread_state, "network_authorization", None)
+    if not isinstance(authorization, dict):
+        raise base.WorkerError("Provider network authorization is unavailable.")
+    mode = str(authorization["mode"])
+    if mode == "deny":
+        policy_text = "Ask First has no pre-approved host/capability pair. Arbitrary web and package access is blocked. Stop and report any required host and capability."
+    elif mode == "allowlisted":
+        policy_text = (
+            "Ask First is restricted to hosts "
+            f"{', '.join(authorization['allowedHosts'])} and capabilities "
+            f"{', '.join(authorization['allowedCapabilities'])}. Do not attempt any other destination or capability."
+        )
+    else:
+        policy_text = "The user explicitly approved Ultra for this isolated run. Public HTTPS is available; private networks and metadata endpoints remain blocked. Record sources and licenses."
+    return _original_build_prompt(context) + "\n\n## Enforced network authorization\n- " + policy_text + "\n"
 
 
 def provider_environment(provider: str) -> dict[str, str]:
@@ -163,14 +138,14 @@ def provider_environment(provider: str) -> dict[str, str]:
         "NO_PROXY": "127.0.0.1,localhost",
         "no_proxy": "127.0.0.1,localhost",
         "CODING_AGENT_PROVIDER": provider,
-        "CODING_AGENT_NETWORK_MODE": network_mode(context.task),
+        "CODING_AGENT_NETWORK_MODE": str(getattr(_thread_state, "network_authorization", {}).get("mode", "deny")),
     })
     return environment
 
 
 def validation_environment() -> dict[str, str]:
-    # Tests run without proxy credentials. On the internal-only worker network,
-    # this makes accidental package downloads or telemetry calls fail closed.
+    # Validation commands receive no network-gate credential. Because the worker is
+    # on an internal-only network, package downloads and telemetry fail closed.
     environment = sanitized_environment()
     environment.update({
         "NO_PROXY": "*",
@@ -213,48 +188,101 @@ def git_environment() -> dict[str, str]:
     return environment
 
 
-def sanitized_environment() -> dict[str, str]:
-    allowed = ("PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "CI", "NODE_ENV", "PNPM_HOME", "COREPACK_HOME")
-    environment = {key: os.environ[key] for key in allowed if key in os.environ}
-    environment.setdefault("CI", "true")
-    environment.setdefault("NODE_ENV", "test")
-    environment["GIT_TERMINAL_PROMPT"] = "0"
-    return environment
+def validate_authorization(value: dict[str, Any]) -> dict[str, Any]:
+    mode = str(value.get("mode", ""))
+    if mode not in {"deny", "allowlisted", "ultra"}:
+        raise base.WorkerError("Unknown network authorization mode.")
+    hosts = value.get("allowedHosts", [])
+    capabilities = value.get("allowedCapabilities", [])
+    if not isinstance(hosts, list) or not all(isinstance(item, str) and normalize_domain(item) for item in hosts):
+        raise base.WorkerError("allowedHosts must contain public DNS hostnames.")
+    if not isinstance(capabilities, list) or not all(item in ALLOWED_CAPABILITIES for item in capabilities):
+        raise base.WorkerError("allowedCapabilities contains an unsupported value.")
+    if mode == "deny" and (hosts or capabilities):
+        raise base.WorkerError("Deny authorization cannot include allowed hosts or capabilities.")
+    if mode == "allowlisted" and (not hosts or not capabilities):
+        raise base.WorkerError("Allowlisted authorization requires hosts and capabilities.")
+    for required in ("requireHttps", "blockPrivateNetworks", "rejectRedirectsUntilRevalidated", "auditRequired"):
+        if value.get(required) is not True:
+            raise base.WorkerError(f"Network authorization requires {required}=true.")
+    expires_at = str(value.get("expiresAt", ""))
+    try:
+        expires_epoch = time.mktime(time.strptime(expires_at.replace(".000Z", "Z"), "%Y-%m-%dT%H:%M:%SZ"))
+    except ValueError as error:
+        raise base.WorkerError("Network authorization has an invalid expiresAt timestamp.") from error
+    if expires_epoch <= time.time():
+        raise base.WorkerError("Network authorization expired before execution.")
+    return {
+        "mode": mode,
+        "allowedHosts": sorted({normalize_domain(item) for item in hosts}),
+        "allowedCapabilities": sorted(set(capabilities)),
+        "requireHttps": True,
+        "blockPrivateNetworks": True,
+        "rejectRedirectsUntilRevalidated": True,
+        "auditRequired": True,
+        "expiresAt": expires_at,
+        "expiresAtEpoch": expires_epoch,
+    }
 
 
-def write_policy(run_id: str, mode: str, domains: list[str], nonce: str) -> None:
+def write_policy(run_id: str, authorization: dict[str, Any], nonce: str) -> None:
     POLICY_ROOT.mkdir(parents=True, exist_ok=True)
-    path = POLICY_ROOT / f"{base.safe_id(run_id)}.json"
     payload = {
+        **authorization,
         "runId": run_id,
         "nonce": nonce,
-        "mode": mode,
-        "approvedDomains": domains,
         "modelProviderDomains": model_domains(),
         "createdAt": base.now_iso(),
-        "expiresAtEpoch": time.time() + POLICY_TTL_SECONDS,
     }
-    base.atomic_write_json(path, payload)
+    base.atomic_write_json(POLICY_ROOT / f"{base.safe_id(run_id)}.json", payload)
 
 
-def list_denied_requests(run_id: str) -> list[dict[str, str]]:
-    pending = POLICY_ROOT / "pending"
-    if not pending.is_dir():
-        return []
+def collect_network_audit(run_id: str, authorization: dict[str, Any]) -> dict[str, Any]:
+    requests: list[dict[str, Any]] = []
     prefix = f"{base.safe_id(run_id)}-"
-    output: list[dict[str, str]] = []
-    for path in sorted(pending.glob(f"{prefix}*.json")):
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+    if AUDIT_ROOT.is_dir():
+        for path in sorted(AUDIT_ROOT.glob(f"{prefix}*.json")):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(value, dict):
+                continue
+            request = {
+                "at": str(value.get("at", "")),
+                "capability": str(value.get("capability", "web_fetch")),
+                "method": str(value.get("method", "GET")),
+                "origin": str(value.get("origin", "")),
+                "path": str(value.get("path", "/")),
+                "allowed": bool(value.get("allowed", False)),
+                "reason": str(value.get("reason", "firewall decision")),
+            }
+            requests.append(request)
+    return {
+        "mode": authorization["mode"],
+        "enforcement": "sandbox_firewall",
+        "requests": requests[-10_000:],
+        "privateNetworkBlocked": True,
+        "metadataEndpointsBlocked": True,
+        "redirectsRevalidated": True,
+    }
+
+
+def clear_run_network_records(run_id: str) -> None:
+    prefix = f"{base.safe_id(run_id)}-"
+    for root in (AUDIT_ROOT, PENDING_ROOT):
+        if not root.is_dir():
             continue
-        if isinstance(value, dict) and isinstance(value.get("domain"), str):
-            output.append({
-                "id": str(value.get("id", "")),
-                "domain": value["domain"],
-                "requestedAt": str(value.get("requestedAt", "")),
-            })
-    return output[-100:]
+        for path in root.glob(f"{prefix}*.json"):
+            path.unlink(missing_ok=True)
+
+
+def model_domains() -> list[str]:
+    raw = os.getenv(
+        "NETWORK_GATE_MODEL_DOMAINS",
+        "openrouter.ai,api.openai.com,api.anthropic.com,api.deepseek.com,generativelanguage.googleapis.com",
+    )
+    return sorted({domain for value in raw.split(",") if (domain := normalize_domain(value))})
 
 
 def proxy_url(identity: str, token: str) -> str:
@@ -262,15 +290,22 @@ def proxy_url(identity: str, token: str) -> str:
     return f"http://{credentials}@{PROXY_HOST}:{PROXY_PORT}"
 
 
-def normalize_domain(value: str) -> str | None:
-    domain = value.strip().lower().replace("https://", "").replace("http://", "").split("/", 1)[0].split(":", 1)[0]
-    if not domain or len(domain) > 253:
-        return None
-    if not all(character.isalnum() or character in ".-" for character in domain):
-        return None
+def normalize_domain(value: str) -> str:
+    domain = value.strip().lower().rstrip(".")
+    if not domain or len(domain) > 253 or any(character in domain for character in "/*@:"):
+        raise base.WorkerError(f"Invalid network host: {value}")
     if "." not in domain:
-        return None
-    return domain.strip(".")
+        raise base.WorkerError(f"Approved host must be a public DNS hostname: {value}")
+    return domain.encode("idna").decode("ascii")
+
+
+def sanitized_environment() -> dict[str, str]:
+    allowed = ("PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "CI", "NODE_ENV", "PNPM_HOME", "COREPACK_HOME")
+    environment = {key: os.environ[key] for key in allowed if key in os.environ}
+    environment.setdefault("CI", "true")
+    environment.setdefault("NODE_ENV", "test")
+    environment["GIT_TERMINAL_PROMPT"] = "0"
+    return environment
 
 
 def max_risk(first: str, second: str) -> str:
