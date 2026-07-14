@@ -63,11 +63,39 @@ export function validateCommandAuthority(
     return { accepted: false, commandId: command.id, code: "unknown_faction", reason: `Unknown faction: ${command.actorFactionId}` };
   }
 
-  if (command.command.type === "set_economy_rates") {
+  if (command.command.type === "set_economy_rates" || command.command.type === "wait") {
     return { accepted: true, command };
   }
 
-  if (command.command.type === "wait") {
+  if (command.command.type === "gather_blackmail_evidence" || command.command.type === "execute_blackmail") {
+    if (!factionEntity.influence || !factionEntity.blackmail) {
+      return {
+        accepted: false,
+        commandId: command.id,
+        code: "feature_unavailable",
+        reason: `Faction ${command.actorFactionId} does not support the in-game blackmail subsystem.`,
+      };
+    }
+    if (command.command.targetFactionId === command.actorFactionId) {
+      return { accepted: false, commandId: command.id, code: "invalid_target", reason: "A faction cannot target itself." };
+    }
+    const target = world.get(command.command.targetFactionId);
+    if (!target?.factionState) {
+      return {
+        accepted: false,
+        commandId: command.id,
+        code: "unknown_faction",
+        reason: `Unknown target faction: ${command.command.targetFactionId}`,
+      };
+    }
+    if (!target.influence || !target.blackmail) {
+      return {
+        accepted: false,
+        commandId: command.id,
+        code: "feature_unavailable",
+        reason: `Target faction ${command.command.targetFactionId} does not support the in-game blackmail subsystem.`,
+      };
+    }
     return { accepted: true, command };
   }
 
