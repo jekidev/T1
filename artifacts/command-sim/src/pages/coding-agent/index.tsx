@@ -37,7 +37,7 @@ interface Capabilities {
   maximumConcurrentRuns: number;
 }
 
-const ACTIVE_STATUSES = new Set<AgentRun["status"]>(["created", "analyzing", "planned", "executing", "validating"]);
+const ACTIVE_STATUSES = new Set<AgentRun["status"]>(["created", "analyzing", "planned", "executing", "validating", "publishing"]);
 
 export default function CodingAgentPage() {
   const [, setLocation] = useLocation();
@@ -55,14 +55,10 @@ export default function CodingAgentPage() {
 
   const request = useCallback(async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
     if (token.trim().length < 24) throw new Error("Enter the separate coding-agent admin token first.");
-    const response = await fetch(path, {
-      ...init,
-      headers: {
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
-        "X-Coding-Agent-Admin-Token": token,
-        ...init.headers,
-      },
-    });
+    const headers = new Headers(init.headers);
+    headers.set("X-Coding-Agent-Admin-Token", token);
+    if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    const response = await fetch(path, { ...init, headers });
     const body = await response.json() as T & { error?: string };
     if (!response.ok) throw new Error(body.error ?? `Request failed with HTTP ${response.status}.`);
     return body;
@@ -104,6 +100,7 @@ export default function CodingAgentPage() {
           baseBranch: "main",
           allowedPaths: paths,
           labels: [],
+          createPullRequest: true,
         }),
       });
       const run = AgentRunSchema.parse(body.run);
@@ -162,7 +159,7 @@ export default function CodingAgentPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")}><ArrowLeft className="h-4 w-4" /></Button>
-            <div><h1 className="text-xl font-semibold">Controlled Coding Agent</h1><p className="text-xs text-muted-foreground">OpenHands/Aider → isolated branch → patch → tests → PR review</p></div>
+            <div><h1 className="text-xl font-semibold">Controlled Coding Agent</h1><p className="text-xs text-muted-foreground">OpenHands/Aider → isolated branch → patch → tests → independent review → PR</p></div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={busy || token.length < 24} onClick={() => void rebuildMap()}><GitBranch className="mr-1 h-3.5 w-3.5" />Rebuild map</Button>
@@ -172,7 +169,7 @@ export default function CodingAgentPage() {
 
         <Card>
           <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-end">
-            <div className="space-y-1"><Label>Separate admin token</Label><Input type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" data-replay-block placeholder="Not stored in localStorage or build variables" /></div>
+            <div className="space-y-1"><Label>Separate admin token</Label><Input type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" data-replay-block placeholder="Kept only in component memory" /></div>
             <div className="flex flex-wrap gap-2 text-[10px]">
               <Readiness label="Exact base commit" ready={capabilities?.baseCommitConfigured ?? false} />
               <Readiness label="External adapter" ready={capabilities?.enabled ?? false} />
