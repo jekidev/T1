@@ -30,10 +30,11 @@ export interface NetworkApprovalRequest {
   targetOrigin: string;
   targetPath: string;
   reason: string;
-  status: "pending" | "approved" | "denied" | "consumed";
+  status: "pending" | "approved" | "denied";
   createdAt: string;
   expiresAt: string;
   decidedAt?: string;
+  lastUsedAt?: string;
 }
 
 interface InternalSession extends NetworkAccessSession {
@@ -115,6 +116,7 @@ export function decideNetworkApproval(input: {
     approvalId: approval.id,
     capability: approval.capability,
     targetOrigin: approval.targetOrigin,
+    targetPath: approval.targetPath,
   });
   return { ...approval };
 }
@@ -128,6 +130,7 @@ export async function requireNetworkAccess(input: {
 }): Promise<{ session: NetworkAccessSession; url: URL; mode: NetworkAccessMode; resolvedAddresses: ResolvedPublicAddress[] }> {
   const session = requireSession(input.sessionId, input.token);
   const url = validatePublicHttpsUrl(input.targetUrl);
+  const targetPath = exactTargetPath(url);
   const reason = input.reason.trim().slice(0, 500);
   if (!reason) throw new Error("A concrete reason is required for internet access.");
 
@@ -136,7 +139,7 @@ export async function requireNetworkAccess(input: {
     audit("network.request.auto_approved", session, {
       capability: input.capability,
       targetOrigin: url.origin,
-      targetPath: truncatePath(url.pathname),
+      targetPath,
       mode: "ultra",
       resolvedAddressCount: resolvedAddresses.length,
     });
@@ -148,17 +151,17 @@ export async function requireNetworkAccess(input: {
     && approval.status === "approved"
     && approval.capability === input.capability
     && approval.targetOrigin === url.origin
-    && approval.targetPath === truncatePath(url.pathname)
+    && approval.targetPath === targetPath
     && Date.parse(approval.expiresAt) > Date.now(),
   );
   if (approved) {
     const resolvedAddresses = await resolvePublicAddresses(url.hostname);
-    approved.status = "consumed";
-    approved.decidedAt = new Date().toISOString();
-    audit("network.approval.consumed", session, {
+    approved.lastUsedAt = new Date().toISOString();
+    audit("network.approval.used", session, {
       approvalId: approved.id,
       capability: input.capability,
       targetOrigin: url.origin,
+      targetPath,
       resolvedAddressCount: resolvedAddresses.length,
     });
     return { session: publicSession(session), url, mode: session.mode, resolvedAddresses };
@@ -169,7 +172,7 @@ export async function requireNetworkAccess(input: {
     && approval.status === "pending"
     && approval.capability === input.capability
     && approval.targetOrigin === url.origin
-    && approval.targetPath === truncatePath(url.pathname)
+    && approval.targetPath === targetPath
     && Date.parse(approval.expiresAt) > Date.now(),
   );
   if (existing) throw new NetworkApprovalRequiredError({ ...existing });
@@ -180,7 +183,7 @@ export async function requireNetworkAccess(input: {
     sessionId: session.id,
     capability: input.capability,
     targetOrigin: url.origin,
-    targetPath: truncatePath(url.pathname),
+    targetPath,
     reason,
     status: "pending",
     createdAt: new Date(now).toISOString(),
@@ -250,8 +253,8 @@ function publicSession(session: InternalSession): NetworkAccessSession {
   return { id: session.id, mode: session.mode, createdAt: session.createdAt, expiresAt: session.expiresAt };
 }
 
-function truncatePath(pathname: string): string {
-  return pathname.slice(0, 500) || "/";
+function exactTargetPath(url: URL): string {
+  return `${url.pathname || "/"}${url.search}`.slice(0, 1000);
 }
 
 function isPrivateIp(hostname: string): boolean {
