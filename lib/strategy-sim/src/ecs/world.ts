@@ -10,6 +10,7 @@ export class StrategyWorld {
     moving: this.ecs.with("identity", "unit", "transform", "movement", "health"),
     combatants: this.ecs.with("identity", "unit", "transform", "combat", "faction", "health"),
     factions: this.ecs.with("identity", "factionState"),
+    blackmailFactions: this.ecs.with("identity", "factionState", "influence", "blackmail"),
     territories: this.ecs.with("identity", "transform", "territory"),
     resourceNodes: this.ecs.with("identity", "transform", "resourceNode"),
     morale: this.ecs.with("identity", "morale", "health"),
