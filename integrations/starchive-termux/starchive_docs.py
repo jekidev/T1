@@ -155,7 +155,7 @@ def fetch_all_starred(
             session,
             "tools/call",
             {"name": "list_starred_repositories", "arguments": arguments},
-            page + 1,
+            page + 2,
             session_id,
         )
         if "error" in payload:
@@ -209,7 +209,7 @@ def export_csv(
     rows = [
         {
             "repo_full_name": repo.get("fullName") or repo.get("full_name", ""),
-            "repo_url": repo.get("url") or repo.get("html_url", ""),
+            "repo_url": repo.get("html_url") or repo.get("url", ""),
             "description": repo.get("description") or "",
             "language": repo.get("language") or "",
             "stars": repo.get("stargazerCount", repo.get("stargazers_count", "")),
