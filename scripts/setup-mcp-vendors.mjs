@@ -11,6 +11,7 @@ const vendors = [
     repository: 'https://github.com/chigwell/telegram-mcp.git',
     branch: 'main',
     required: true,
+    uvSync: true,
   },
   {
     name: 'tg_auth_api',
@@ -26,6 +27,17 @@ function run(command, args, cwd = root) {
     child.on('error', reject);
     child.on('exit', code => code === 0 ? resolve() : reject(new Error(`${command} exited with ${code}`)));
   });
+}
+
+async function tryUvSync(target, required) {
+  try {
+    console.log(`Syncing ${path.relative(root, target)} with uv...`);
+    await run('uv', ['sync'], target);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to sync ${path.relative(root, target)}:`, message);
+    if (required) process.exitCode = 1;
+  }
 }
 
 async function exists(target) {
@@ -44,6 +56,9 @@ for (const vendor of vendors) {
     } else {
       console.log(`Cloning ${vendor.name}...`);
       await run('git', ['clone', '--depth', '1', '--branch', vendor.branch, vendor.repository, target]);
+    }
+    if (vendor.uvSync) {
+      await tryUvSync(target, vendor.required);
     }
   } catch (error) {
     console.error(`Failed to install ${vendor.name}:`, error instanceof Error ? error.message : error);

@@ -41,9 +41,16 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# Local environment configuration (contains secrets; keep out of git)
+.env
+.env.*.local
+
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
 # Replit
 .cache/
 .local/
+
+# MCP vendor checkouts (installed by pnpm setup:mcp)
+/integrations/vendor/
