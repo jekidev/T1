@@ -18,6 +18,7 @@ import {
   loadWorkspaceState,
   saveWorkspaceState,
   type LlmWorkspaceMode,
+  type WorkspaceAsset,
 } from "@/lib/workspace";
 import { Blocks, Hammer, MessageCircle, Network, ScrollText, UsersRound } from "lucide-react";
 
@@ -33,7 +34,14 @@ interface BuildProposal {
   };
   phases?: Array<{ name: string; description: string }>;
   timelineEvents?: Array<{ label: string; description: string; severity: "info" | "caution" | "critical" }>;
-  entities?: Array<{ label: string; category: EntityCategory; faction: Faction; notes: string }>;
+  entities?: Array<{
+    label: string;
+    category: EntityCategory;
+    faction: Faction;
+    notes: string;
+    assetId?: string;
+    caption?: string;
+  }>;
 }
 
 const ENTITY_CATEGORIES = new Set<EntityCategory>(["unit", "location", "resource", "objective", "evidence", "vehicle", "civilian", "event"]);
@@ -99,33 +107,40 @@ export function AdvisorWorkspaceShell() {
     }
 
     const now = new Date().toISOString();
-    const additions = (proposal.entities ?? []).slice(0, 60).map((entity, index): BoardEntity => ({
-      id: nanoid(10),
-      templateId: entity.category === "unit" ? "unit-network" : entity.category === "vehicle" ? "vehicle-car" : entity.category === "evidence" ? "evidence-document" : "location-building",
-      category: entity.category,
-      faction: entity.faction,
-      label: entity.label.slice(0, 120),
-      x: 120 + ((board.entities.length + index) * 97) % 760,
-      y: 120 + ((board.entities.length + index) * 149) % 760,
-      rotation: 0,
-      scale: 1,
-      zIndex: board.entities.length + index,
-      layerId: board.layers[0]?.id ?? "layer-default",
-      zoneId: null,
-      groupId: null,
-      locked: false,
-      attributes: { ...DEFAULT_ATTRIBUTES },
-      notes: entity.notes.slice(0, 2000),
-      ...(entity.category === "unit" ? {
-        profile: {
-          personality: "Defined through the approved LLM build proposal and future player interaction.",
-          biography: entity.notes.slice(0, 500),
-          traits: ["llm-built"],
-          source: "generated" as const,
-        },
-      } : {}),
-      sourceStatus: "fictional",
-    }));
+    const usedWorkspaceAssetIds = new Set<string>();
+    const additions = (proposal.entities ?? []).slice(0, 60).map((entity, index): BoardEntity => {
+      const asset = entity.assetId ? resolveWorkspaceAsset(workspace.assets, entity.assetId) : undefined;
+      if (asset) usedWorkspaceAssetIds.add(asset.id);
+      return {
+        id: nanoid(10),
+        templateId: entity.category === "unit" ? "unit-network" : entity.category === "vehicle" ? "vehicle-car" : entity.category === "evidence" ? "evidence-document" : "location-building",
+        category: entity.category,
+        faction: entity.faction,
+        label: entity.label.slice(0, 120),
+        x: 120 + ((board.entities.length + index) * 97) % 760,
+        y: 120 + ((board.entities.length + index) * 149) % 760,
+        rotation: 0,
+        scale: 1,
+        zIndex: board.entities.length + index,
+        layerId: board.layers[0]?.id ?? "layer-default",
+        zoneId: null,
+        groupId: null,
+        locked: false,
+        attributes: { ...DEFAULT_ATTRIBUTES },
+        notes: entity.notes.slice(0, 2000),
+        ...(asset ? { media: mediaReference(asset, entity.caption) } : {}),
+        ...(entity.category === "unit" ? {
+          profile: {
+            personality: "Defined through the approved LLM build proposal and future player interaction.",
+            biography: entity.notes.slice(0, 500),
+            traits: ["llm-built"],
+            source: "generated" as const,
+            ...(asset?.mimeType.startsWith("image/") ? { avatarAssetId: asset.sourceId, avatarUrl: asset.sourceUrl } : {}),
+          },
+        } : {}),
+        sourceStatus: "fictional",
+      };
+    });
 
     let entities = [...board.entities, ...additions];
     let playerWorkspace = board.playerWorkspace ?? {
@@ -139,6 +154,14 @@ export function AdvisorWorkspaceShell() {
 
     if (proposal.playerProfile) {
       const profile = proposal.playerProfile;
+      const profileAsset = profile.avatarAssetId ? resolveWorkspaceAsset(workspace.assets, profile.avatarAssetId) : undefined;
+      if (profileAsset) usedWorkspaceAssetIds.add(profileAsset.id);
+      const approvedAvatarUrl = profileAsset?.mimeType.startsWith("image/")
+        ? profileAsset.sourceUrl
+        : safeAvatarUrl(profile.avatarUrl);
+      const approvedAvatarSourceId = profileAsset?.mimeType.startsWith("image/")
+        ? profileAsset.sourceId
+        : undefined;
       let bossIndex = playerWorkspace.bossEntityId
         ? entities.findIndex(entity => entity.id === playerWorkspace.bossEntityId)
         : -1;
@@ -146,7 +169,7 @@ export function AdvisorWorkspaceShell() {
 
       if (bossIndex < 0) {
         const bossId = `boss-${nanoid(8)}`;
-        entities = [...entities, createBossEntity(bossId, profile, board.layers[0]?.id ?? "layer-default")];
+        entities = [...entities, createBossEntity(bossId, profile, board.layers[0]?.id ?? "layer-default", approvedAvatarUrl, approvedAvatarSourceId)];
         playerWorkspace = { ...playerWorkspace, bossEntityId: bossId, startingCapital: 0, startedAlone: true };
       } else {
         const boss = entities[bossIndex]!;
@@ -162,8 +185,8 @@ export function AdvisorWorkspaceShell() {
             source: "generated",
             walletMinor: 0,
             maximumRecordedWalletMinor: Math.max(0, boss.profile?.maximumRecordedWalletMinor ?? 0),
-            ...(profile.avatarUrl ? { avatarUrl: profile.avatarUrl.slice(0, 2000) } : {}),
-            ...(profile.avatarAssetId ? { avatarAssetId: profile.avatarAssetId.slice(0, 240) } : {}),
+            ...(approvedAvatarUrl ? { avatarUrl: approvedAvatarUrl } : {}),
+            ...(approvedAvatarSourceId ? { avatarAssetId: approvedAvatarSourceId } : {}),
             role: "Boss",
           },
         } : entity);
@@ -171,6 +194,13 @@ export function AdvisorWorkspaceShell() {
       }
       playerApplied = true;
     }
+
+    playerWorkspace = {
+      ...playerWorkspace,
+      ownedAssetIds: [...new Set([...playerWorkspace.ownedAssetIds, ...usedWorkspaceAssetIds])],
+      startingCapital: 0,
+      startedAlone: true,
+    };
 
     const existingPhaseNames = new Set(board.phases.map(phase => phase.name.toLowerCase()));
     const phases = (proposal.phases ?? [])
@@ -193,6 +223,7 @@ export function AdvisorWorkspaceShell() {
     }));
     const summaryParts = [
       `${additions.length} entities`,
+      `${usedWorkspaceAssetIds.size} asset bindings`,
       `${phases.length} phases`,
       `${events.length} events`,
       ...(playerApplied ? ["boss profile"] : []),
@@ -313,6 +344,8 @@ function createBossEntity(
   id: string,
   profile: NonNullable<BuildProposal["playerProfile"]>,
   layerId: string,
+  avatarUrl?: string,
+  avatarAssetId?: string,
 ): BoardEntity {
   return {
     id,
@@ -339,8 +372,8 @@ function createBossEntity(
       role: "Boss",
       walletMinor: 0,
       maximumRecordedWalletMinor: 0,
-      ...(profile.avatarUrl ? { avatarUrl: profile.avatarUrl.slice(0, 2000) } : {}),
-      ...(profile.avatarAssetId ? { avatarAssetId: profile.avatarAssetId.slice(0, 240) } : {}),
+      ...(avatarUrl ? { avatarUrl } : {}),
+      ...(avatarAssetId ? { avatarAssetId } : {}),
     },
     sourceStatus: "fictional",
   };
@@ -354,7 +387,14 @@ function parseBuildProposal(text: string): BuildProposal | null {
     const parsed = JSON.parse(candidate) as BuildProposal;
     if (!parsed || typeof parsed !== "object") return null;
     if (parsed.playerProfile && !isValidPlayerProfile(parsed.playerProfile)) return null;
-    if (parsed.entities && !parsed.entities.every(entity => typeof entity.label === "string" && typeof entity.notes === "string" && ENTITY_CATEGORIES.has(entity.category) && FACTIONS.has(entity.faction))) return null;
+    if (parsed.entities && !parsed.entities.every(entity =>
+      typeof entity.label === "string"
+      && typeof entity.notes === "string"
+      && ENTITY_CATEGORIES.has(entity.category)
+      && FACTIONS.has(entity.faction)
+      && (entity.assetId === undefined || typeof entity.assetId === "string")
+      && (entity.caption === undefined || typeof entity.caption === "string")
+    )) return null;
     if (parsed.phases && !parsed.phases.every(phase => typeof phase.name === "string" && typeof phase.description === "string")) return null;
     if (parsed.timelineEvents && !parsed.timelineEvents.every(event => typeof event.label === "string" && typeof event.description === "string" && ["info", "caution", "critical"].includes(event.severity))) return null;
     return parsed;
@@ -371,4 +411,30 @@ function isValidPlayerProfile(profile: NonNullable<BuildProposal["playerProfile"
     && profile.traits.every(trait => typeof trait === "string")
     && (profile.avatarUrl === undefined || typeof profile.avatarUrl === "string")
     && (profile.avatarAssetId === undefined || typeof profile.avatarAssetId === "string");
+}
+
+function resolveWorkspaceAsset(assets: WorkspaceAsset[], assetId: string): WorkspaceAsset | undefined {
+  return assets.find(asset => asset.id === assetId || asset.sourceId === assetId);
+}
+
+function mediaReference(asset: WorkspaceAsset, caption?: string) {
+  return {
+    assetId: asset.id,
+    sourceId: asset.sourceId,
+    url: asset.sourceUrl,
+    mimeType: asset.mimeType,
+    origin: asset.origin,
+    ...(caption?.trim() ? { caption: caption.trim().slice(0, 500) } : {}),
+  };
+}
+
+function safeAvatarUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (value.startsWith("/api/asset-generation/sources/")) return value.slice(0, 2000);
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString().slice(0, 2000) : undefined;
+  } catch {
+    return undefined;
+  }
 }
