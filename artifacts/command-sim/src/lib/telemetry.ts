@@ -170,8 +170,8 @@ export function installTelemetry() {
       zones: board.zones.length,
       phases: board.phases.length,
       currentPhaseId: board.currentPhaseId,
-      timeline: board.timeline.length,
-      moveLog: board.moveLog.length,
+      timeline: board.timelineEvents.length,
+      moveLog: board.moveHistory.length,
       selectedIds: state.selectedIds,
     });
     if (signature === lastBoardSignature) return;
