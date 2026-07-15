@@ -18,6 +18,7 @@ POST   /api/mcp/memory
 DELETE /api/mcp/memory/:id
 GET    /api/mcp/filesystem/list?path=features
 GET    /api/mcp/filesystem/read?path=features/README.md
+GET    /api/mcp/servers/:id/health
 
 GET    /api/telegram/auth/status
 POST   /api/telegram/auth/start
@@ -42,6 +43,7 @@ pnpm setup:mcp
 This clones and builds:
 
 - `chigwell/telegram-mcp` into `integrations/vendor/telegram-mcp`
+- `jekidev/telegram-mcp-1` into `integrations/vendor/telegram-mcp-1` (Telegram MCP v2)
 - `megahomyak/tg_auth_api` into `integrations/vendor/tg_auth_api`
 - `gonchasobaka/agents-sms` into `integrations/vendor/agents-sms` (5sim / SMS-Activate / OnlineSim)
 - `jiridudekusy/signal-cli-mcp` into `integrations/vendor/signal-cli-mcp`
@@ -56,9 +58,13 @@ The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_
 
 `signal-cli-mcp` proposes sending Signal messages and creating groups, but nothing is sent without explicit human approval through a local web GUI. It requires a running `signal-cli-rest-api` instance; start it with the `docker-compose.yml` in `integrations/vendor/signal-cli-mcp` and link the device via the QR code endpoint. Set `SIGNAL_ACCOUNT` to the registered E.164 number.
 
+## Telegram MCP v2
+
+`telegram-mcp-1` is an alternative Telegram MCP server based on `telethon` with 80+ tools grouped into accounts, chats, messages, contacts, media, groups, folders and profile. It runs with `uv --directory integrations/vendor/telegram-mcp-1 run main.py` and requires `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` and `TELEGRAM_SESSION_STRING` (or `TELEGRAM_SESSION_NAME` for file-based sessions). Writes are marked approval-required.
+
 ## Telegram modify mode
 
-`TELEGRAM_EXPOSED_TOOLS=all` exposes read and modifying Telegram tools. T1 marks Telegram writes as approval-required. The AI must show the intended recipients, action and payload before a modifying call is authorized.
+`TELEGRAM_EXPOSED_TOOLS=all` exposes read and modifying Telegram tools for the original `telegram` MCP. T1 marks Telegram writes as approval-required. The AI must show the intended recipients, action and payload before a modifying call is authorized.
 
 ## External MCP services
 
@@ -69,5 +75,6 @@ The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_
 - RSSHub is accessed through `RSSHUB_BASE_URL`.
 - 5sim / SMS provider MCP runs locally through `integrations/vendor/agents-sms`.
 - Signal CLI MCP runs locally through `integrations/vendor/signal-cli-mcp` and depends on `signal-cli-rest-api`.
+- Telegram MCP v2 runs locally through `integrations/vendor/telegram-mcp-1`.
 
 Browser code never receives provider tokens and cannot directly spawn arbitrary stdio processes.

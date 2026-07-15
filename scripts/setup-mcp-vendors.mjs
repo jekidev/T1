@@ -13,6 +13,12 @@ const vendors = [
     required: true,
   },
   {
+    name: 'telegram-mcp-1',
+    repository: 'https://github.com/jekidev/telegram-mcp-1.git',
+    branch: 'main',
+    required: true,
+  },
+  {
     name: 'tg_auth_api',
     repository: 'https://github.com/megahomyak/tg_auth_api.git',
     branch: 'master',
@@ -83,3 +89,4 @@ console.log('Telegram credentials must be stored in platform secrets, never comm
 console.log('Run Telegram MCP with TELEGRAM_EXPOSED_TOOLS=all only when modify tools are intended and approved.');
 console.log('5sim SMS API requires FIVESIM_API_KEY (or SMSACTIVATE_API_KEY / ONLINESIM_API_KEY) in environment variables.');
 console.log('Signal CLI MCP requires SIGNAL_ACCOUNT and a running signal-cli-rest-api instance (see docker-compose in integrations/vendor/signal-cli-mcp).');
+console.log('telegram-mcp-1 requires TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION_STRING (or TELEGRAM_SESSION_NAME) in environment variables.');
