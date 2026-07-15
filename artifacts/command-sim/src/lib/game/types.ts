@@ -31,6 +31,15 @@ export interface EntityProfile {
   accent?: string;
 }
 
+export interface EntityMediaReference {
+  assetId: string;
+  sourceId: string;
+  url: string;
+  mimeType: string;
+  origin: "upload" | "chatgpt" | "grok" | "other";
+  caption?: string;
+}
+
 export interface BoardEntity {
   id: string;
   templateId: string;
@@ -50,6 +59,7 @@ export interface BoardEntity {
   attributes: EntityAttributes;
   notes: string;
   profile?: EntityProfile;
+  media?: EntityMediaReference;
   sourceStatus?: FactStatus;
   sourceIds?: string[];
 }
