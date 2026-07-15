@@ -22,13 +22,15 @@
     "local:setup": "pnpm setup",
     "local:run": "NODE_ENV=production pnpm build && pnpm start",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "prepare": "husky"
   },
   "private": true,
   "dependencies": {
     "@replit/connectors-sdk": "^0.4.1"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "prettier": "^3.9.5",
     "typescript": "~5.9.3"
   }
