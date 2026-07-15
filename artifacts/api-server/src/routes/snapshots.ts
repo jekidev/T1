@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq } from "drizzle-orm";
-import { db, scenarioSnapshotsTable, scenariosTable } from "@workspace/db";
+import { and, db, eq, scenarioSnapshotsTable, scenariosTable } from "@workspace/db";
 import { CreateSnapshotBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();

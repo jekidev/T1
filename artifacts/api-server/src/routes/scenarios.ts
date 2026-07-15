@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, scenariosTable } from "@workspace/db";
+import { db, eq, scenariosTable } from "@workspace/db";
 import {
   CreateScenarioBody,
   UpdateScenarioBody,
