@@ -9,13 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Network, Search, UserPlus, UserRound, Users, X } from "lucide-react";
 
-interface TelegramPerson {
-  id: string;
-  displayName: string;
-  username?: string;
-  biography?: string;
-  avatarUrl?: string;
-}
+interface TelegramPerson { id: string; displayName: string; username?: string; biography?: string; avatarUrl?: string; }
 
 export function FamilyTreePanel({ open, board, onClose, onChange }: { open: boolean; board: BoardState; onClose: () => void; onChange: (board: BoardState) => void }) {
   const world = board.simulation?.syndicateWorld;
@@ -104,7 +98,7 @@ export function FamilyTreePanel({ open, board, onClose, onChange }: { open: bool
             {!selected || !world ? <div className="grid h-full place-items-center text-muted-foreground">No syndicate exists yet.</div> : <div className="mx-auto max-w-6xl space-y-5">
               <div className="rounded-xl border bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.15),transparent_55%),hsl(var(--card))] p-5 text-center shadow-2xl"><Badge variant="outline">FOUNDING BOSS</Badge><h3 className="mt-2 text-2xl font-bold">{selected.name}</h3><p className="text-xs text-muted-foreground">{selected.memberIds.length} registered members · {selected.resources.capital.toFixed(0)} capital · loyalty {selected.internalLoyalty.toFixed(0)}</p></div>
               <div className="mx-auto h-8 w-px bg-gradient-to-b from-primary to-border" />
-              <div className="space-y-6">{rankedRoles.map((role, roleIndex) => { const members = world.memberships.filter(member => member.syndicateId === selected.id && member.roleId === role.id); return <section key={role.id}><div className="mb-3 flex items-center gap-3"><div className="h-px flex-1 bg-border" /><Badge className="shadow-md">{role.title} · rank {roleIndex + 1}</Badge><div className="h-px flex-1 bg-border" /></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{members.length === 0 ? <div className="col-span-full rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">Vacant role</div> : members.map(member => { const entity = entityById.get(member.npcId); return <Card key={`${member.npcId}-${role.id}`} className="overflow-hidden border-primary/20 shadow-lg"><CardContent className="flex gap-3 p-3"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border bg-muted shadow-inner">{entity?.profile?.avatarUrl ? <img src={entity.profile.avatarUrl} alt={entity.label} className="h-full w-full object-cover" /> : <UserRound className="h-6 w-6 text-muted-foreground" />}</div><div className="min-w-0"><div className="truncate text-sm font-semibold">{entity?.label ?? member.npcId}</div><div className="text-[9px] text-muted-foreground">loyalty {member.loyalty.toFixed(0)} · trust {member.trust.toFixed(0)} · competence {member.competence.toFixed(0)}</div><p className="mt-1 line-clamp-3 text-[10px]">{entity?.profile?.personality ?? role.responsibilities.join(" · ")}</p></div></CardContent></Card>; });}</div></section>; })}</div>
+              <div className="space-y-6">{rankedRoles.map((role, roleIndex) => { const members = world.memberships.filter(member => member.syndicateId === selected.id && member.roleId === role.id); return <section key={role.id}><div className="mb-3 flex items-center gap-3"><div className="h-px flex-1 bg-border" /><Badge className="shadow-md">{role.title} · rank {roleIndex + 1}</Badge><div className="h-px flex-1 bg-border" /></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{members.length === 0 ? <div className="col-span-full rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">Vacant role</div> : members.map(member => { const entity = entityById.get(member.npcId); return <Card key={`${member.npcId}-${role.id}`} className="overflow-hidden border-primary/20 shadow-lg"><CardContent className="flex gap-3 p-3"><div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border bg-muted shadow-inner">{entity?.profile?.avatarUrl ? <img src={entity.profile.avatarUrl} alt={entity.label} className="h-full w-full object-cover" /> : <UserRound className="h-6 w-6 text-muted-foreground" />}</div><div className="min-w-0"><div className="truncate text-sm font-semibold">{entity?.label ?? member.npcId}</div><div className="text-[9px] text-muted-foreground">loyalty {member.loyalty.toFixed(0)} · trust {member.trust.toFixed(0)} · competence {member.competence.toFixed(0)}</div><p className="mt-1 line-clamp-3 text-[10px]">{entity?.profile?.personality ?? role.responsibilities.join(" · ")}</p></div></CardContent></Card>; })}</div></section>; })}</div>
               <div className="rounded-xl border bg-card/80 p-4 shadow-lg"><div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Users className="h-4 w-4" />Unassigned people</div><div className="flex flex-wrap gap-2">{board.entities.filter(entity => entity.category === "unit" && !selected.memberIds.includes(entity.id)).map(entity => <Badge key={entity.id} variant="outline">{entity.label}</Badge>)}</div></div>
             </div>}
           </main>
@@ -122,12 +116,16 @@ function normalizePeople(body: unknown): TelegramPerson[] {
     const first = stringValue(person.first_name) ?? stringValue(person.firstName);
     const last = stringValue(person.last_name) ?? stringValue(person.lastName);
     const username = stringValue(person.username);
+    const combinedName = [first, last].filter(Boolean).join(" ");
+    const displayName = stringValue(person.displayName) ?? stringValue(person.name) ?? combinedName || username || `Telegram person ${index + 1}`;
+    const avatarUrl = stringValue(person.avatarUrl) ?? stringValue(person.photo_url);
+    const biography = stringValue(person.bio);
     return {
       id: String(person.id ?? person.user_id ?? `telegram-${index}`),
-      displayName: stringValue(person.displayName) ?? stringValue(person.name) ?? [first, last].filter(Boolean).join(" ") || username || `Telegram person ${index + 1}`,
+      displayName,
       ...(username ? { username } : {}),
-      ...(stringValue(person.bio) ? { biography: stringValue(person.bio) } : {}),
-      ...(stringValue(person.avatarUrl) ?? stringValue(person.photo_url) ? { avatarUrl: stringValue(person.avatarUrl) ?? stringValue(person.photo_url) } : {}),
+      ...(biography ? { biography } : {}),
+      ...(avatarUrl ? { avatarUrl } : {}),
     };
   });
 }
