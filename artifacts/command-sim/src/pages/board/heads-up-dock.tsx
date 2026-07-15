@@ -3,6 +3,7 @@ import { Bell, BellRing, Brain, Code2, Minimize2, RefreshCw } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LLM_MODE_META, type LlmUserMode, useLlmMode } from "@/lib/llm-mode";
+import type { BoardState } from "@/lib/game";
 
 interface HeadsUpNotification {
   id: string;
@@ -18,7 +19,7 @@ interface HeadsUpNotification {
 }
 
 interface HeadsUpDockProps {
-  board: Record<string, unknown>;
+  board: BoardState;
   behavior?: string | null;
 }
 
@@ -30,15 +31,14 @@ function browserNotify(notification: HeadsUpNotification) {
   });
 }
 
-function boardSignature(board: Record<string, unknown>): string {
-  const simulation = board.simulation && typeof board.simulation === "object" ? board.simulation as Record<string, unknown> : {};
-  const moveLog = Array.isArray(board.moveLog) ? board.moveLog : [];
+function boardSignature(board: BoardState): string {
+  const simulation = board.simulation;
   return JSON.stringify({
-    turn: simulation.turn,
+    turn: simulation?.turn,
     currentPhaseId: board.currentPhaseId,
-    entities: Array.isArray(board.entities) ? board.entities.length : 0,
-    zones: Array.isArray(board.zones) ? board.zones.length : 0,
-    latestMove: moveLog.at(-1),
+    entities: board.entities.length,
+    zones: board.zones.length,
+    latestMove: board.moveHistory.at(-1),
   });
 }
 
