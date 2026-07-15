@@ -11,6 +11,10 @@ interface ServerWorkspaceAsset extends WorkspaceAsset {
   updatedAt?: string;
 }
 
+interface WorkspaceStatus {
+  ready?: boolean;
+}
+
 /**
  * Synchronizes the browser workspace asset catalog with the authenticated
  * server-side account catalog. Source bytes remain in the validated asset
@@ -26,15 +30,21 @@ export function WorkspaceAssetSync() {
       if (busy || cancelled) return;
       busy = true;
       try {
+        const statusResponse = await fetch("/api/workspace/status", { credentials: "include" });
+        if (!statusResponse.ok) return;
+        const status = await statusResponse.json() as WorkspaceStatus;
+        if (!status.ready) return;
+
         const response = await fetch("/api/workspace/assets", { credentials: "include" });
         if (!response.ok) return;
         const body = await response.json() as { assets?: ServerWorkspaceAsset[] };
         const remote = Array.isArray(body.assets) ? body.assets : [];
+        knownServerIds.clear();
         remote.forEach(asset => knownServerIds.add(asset.id));
 
         const current = stateInput ?? loadWorkspaceState();
         const merged = mergeAssets(current.assets, remote);
-        if (!sameAssetIds(current.assets, merged)) {
+        if (!sameAssets(current.assets, merged)) {
           saveWorkspaceState({ ...current, assets: merged });
         }
 
@@ -94,6 +104,16 @@ function stripServerFields(asset: ServerWorkspaceAsset): WorkspaceAsset {
   };
 }
 
-function sameAssetIds(first: WorkspaceAsset[], second: WorkspaceAsset[]): boolean {
-  return first.length === second.length && first.every((asset, index) => asset.id === second[index]?.id);
+function sameAssets(first: WorkspaceAsset[], second: WorkspaceAsset[]): boolean {
+  return first.length === second.length && first.every((asset, index) => {
+    const other = second[index];
+    return other
+      && asset.id === other.id
+      && asset.name === other.name
+      && asset.sourceId === other.sourceId
+      && asset.sourceUrl === other.sourceUrl
+      && asset.origin === other.origin
+      && asset.mimeType === other.mimeType
+      && asset.createdAt === other.createdAt;
+  });
 }
