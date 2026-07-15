@@ -8,6 +8,7 @@ import { Eye, EyeOff, Lock, Unlock, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { PersonProfileEditor } from "./person-profile-editor";
+import { EntityMediaEditor } from "./entity-media-editor";
 import { SceneEnvironmentPanel } from "./scene-environment-panel";
 
 export function PropertiesSidebar() {
@@ -50,6 +51,11 @@ export function PropertiesSidebar() {
                     </div>
                   </div>
                 )}
+
+                <EntityMediaEditor
+                  entity={selectedEntity}
+                  onUpdate={patch => updateEntity(selectedEntity.id, patch)}
+                />
 
                 <div className="space-y-3">
                   <div className="grid gap-1.5">
