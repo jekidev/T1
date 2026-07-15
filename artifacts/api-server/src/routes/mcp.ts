@@ -42,10 +42,20 @@ async function writeMemories(memories: MemoryRecord[]) {
   await fs.writeFile(memoryFile, JSON.stringify(memories, null, 2), "utf8");
 }
 
+let cachedRegistry: McpServerRecord[] | null = null;
+let cachedRegistryAt = 0;
+const REGISTRY_CACHE_TTL_MS = 30_000;
+
 async function readRegistry(): Promise<McpServerRecord[]> {
+  const now = Date.now();
+  if (cachedRegistry && now - cachedRegistryAt < REGISTRY_CACHE_TTL_MS) {
+    return cachedRegistry;
+  }
   const file = path.resolve(process.cwd(), "integrations/mcp/servers.json");
   const parsed = JSON.parse(await fs.readFile(file, "utf8")) as { servers: McpServerRecord[] };
-  return parsed.servers;
+  cachedRegistry = parsed.servers;
+  cachedRegistryAt = now;
+  return cachedRegistry;
 }
 
 function getConfigStatus(server: McpServerRecord): { configured: boolean; missingEnvironment: string[] } {
