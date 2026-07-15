@@ -11,6 +11,9 @@ out-tsc
 # dependencies
 node_modules
 
+# External MCP vendor repositories cloned by scripts/setup-mcp-vendors.mjs
+integrations/vendor
+
 # IDEs and editors
 /.idea
 .project

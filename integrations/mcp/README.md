@@ -39,12 +39,22 @@ Run:
 pnpm setup:mcp
 ```
 
-This clones:
+This clones and builds:
 
 - `chigwell/telegram-mcp` into `integrations/vendor/telegram-mcp`
 - `megahomyak/tg_auth_api` into `integrations/vendor/tg_auth_api`
+- `gonchasobaka/agents-sms` into `integrations/vendor/agents-sms` (5sim / SMS-Activate / OnlineSim)
+- `jiridudekusy/signal-cli-mcp` into `integrations/vendor/signal-cli-mcp`
 
 The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_URL`. Its exact startup command and endpoint names may differ by revision; configure or adapt the proxy before production use. Secrets and Telegram session strings must remain in the hosting platform secret store.
+
+## 5sim / SMS provider MCP
+
+`agents-sms` is a local stdio MCP for buying virtual phone numbers and receiving SMS codes. Set at least one provider key (`FIVESIM_API_KEY`, `SMSACTIVATE_API_KEY`, or `ONLINESIM_API_KEY`) before enabling the server. Purchasing numbers is treated as an approval-required write.
+
+## Signal CLI MCP
+
+`signal-cli-mcp` proposes sending Signal messages and creating groups, but nothing is sent without explicit human approval through a local web GUI. It requires a running `signal-cli-rest-api` instance; start it with the `docker-compose.yml` in `integrations/vendor/signal-cli-mcp` and link the device via the QR code endpoint. Set `SIGNAL_ACCOUNT` to the registered E.164 number.
 
 ## Telegram modify mode
 
@@ -57,5 +67,7 @@ The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_
 - Google Maps uses a server-side adapter and `GOOGLE_MAPS_API_KEY`.
 - Playwright MCP runs through `npx @playwright/mcp@latest` in an approved development runtime.
 - RSSHub is accessed through `RSSHUB_BASE_URL`.
+- 5sim / SMS provider MCP runs locally through `integrations/vendor/agents-sms`.
+- Signal CLI MCP runs locally through `integrations/vendor/signal-cli-mcp` and depends on `signal-cli-rest-api`.
 
 Browser code never receives provider tokens and cannot directly spawn arbitrary stdio processes.
