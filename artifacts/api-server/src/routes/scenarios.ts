@@ -1,49 +1,30 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, scenariosTable } from "@workspace/db";
+import { CreateScenarioBody, UpdateScenarioBody } from "@workspace/api-zod";
 import {
-  CreateScenarioBody,
-  UpdateScenarioBody,
-} from "@workspace/api-zod";
+  createScenario,
+  deleteScenario,
+  getScenario,
+  listScenarios,
+  updateScenario,
+} from "../lib/scenario-store";
 
 const router: IRouter = Router();
 
 router.get("/scenarios", async (req, res) => {
-  const rows = await db
-    .select({
-      id: scenariosTable.id,
-      name: scenariosTable.name,
-      description: scenariosTable.description,
-      mapTemplateId: scenariosTable.mapTemplateId,
-      updatedAt: scenariosTable.updatedAt,
-      createdAt: scenariosTable.createdAt,
-    })
-    .from(scenariosTable)
-    .orderBy(scenariosTable.updatedAt);
+  const rows = listScenarios();
   req.log.info({ count: rows.length }, "Listed scenarios");
   res.json(rows);
 });
 
 router.post("/scenarios", async (req, res) => {
   const body = CreateScenarioBody.parse(req.body);
-  const [row] = await db
-    .insert(scenariosTable)
-    .values({
-      name: body.name,
-      description: body.description ?? null,
-      mapTemplateId: body.mapTemplateId,
-      board: body.board,
-    })
-    .returning();
+  const row = createScenario(body);
   res.status(201).json(row);
 });
 
 router.get("/scenarios/:id", async (req, res): Promise<void> => {
   const id = Number(req.params["id"]);
-  const [row] = await db
-    .select()
-    .from(scenariosTable)
-    .where(eq(scenariosTable.id, id));
+  const row = getScenario(id);
   if (!row) {
     res.status(404).json({ message: "Scenario not found" });
     return;
@@ -54,16 +35,7 @@ router.get("/scenarios/:id", async (req, res): Promise<void> => {
 router.patch("/scenarios/:id", async (req, res): Promise<void> => {
   const id = Number(req.params["id"]);
   const body = UpdateScenarioBody.parse(req.body);
-  const [row] = await db
-    .update(scenariosTable)
-    .set({
-      ...(body.name !== undefined ? { name: body.name } : {}),
-      ...(body.description !== undefined ? { description: body.description } : {}),
-      ...(body.mapTemplateId !== undefined ? { mapTemplateId: body.mapTemplateId } : {}),
-      ...(body.board !== undefined ? { board: body.board } : {}),
-    })
-    .where(eq(scenariosTable.id, id))
-    .returning();
+  const row = updateScenario(id, body);
   if (!row) {
     res.status(404).json({ message: "Scenario not found" });
     return;
@@ -73,11 +45,7 @@ router.patch("/scenarios/:id", async (req, res): Promise<void> => {
 
 router.delete("/scenarios/:id", async (req, res): Promise<void> => {
   const id = Number(req.params["id"]);
-  const [row] = await db
-    .delete(scenariosTable)
-    .where(eq(scenariosTable.id, id))
-    .returning({ id: scenariosTable.id });
-  if (!row) {
+  if (!deleteScenario(id)) {
     res.status(404).json({ message: "Scenario not found" });
     return;
   }

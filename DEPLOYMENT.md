@@ -126,6 +126,5 @@ NODE_ENV=production pnpm start
 PORT=8080
 BASE_PATH=/
 OPENROUTER_API_KEY=
-DATABASE_URL=
 GOOGLE_DRIVE_RAG_PATH=rag/google-drive
 ```

@@ -4,17 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm run build && cd ../.. && NODE_ENV=development node --enable-source-maps artifacts/api-server/dist/index.mjs",
+    "dev": "pnpm run build && cd ../.. && NODE_ENV=development node --enable-source-maps --env-file-if-exists=.env artifacts/api-server/dist/index.mjs",
     "build": "node ./build.mjs",
-    "start": "cd ../.. && node --enable-source-maps artifacts/api-server/dist/index.mjs",
+    "start": "cd ../.. && node --enable-source-maps --env-file-if-exists=.env artifacts/api-server/dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
-    "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "drizzle-orm": "catalog:",
     "express": "^5.2.1",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0"
