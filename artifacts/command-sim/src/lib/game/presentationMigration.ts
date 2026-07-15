@@ -5,6 +5,35 @@ import {
   type EntityProfile,
 } from "./types";
 
+export function boardNeedsPresentationMigration(board: BoardState): boolean {
+  if ((board.version || 0) < 7) return true;
+  if (!board.environment) return true;
+  const environment = board.environment;
+  if (
+    !environment.sceneName
+    || !environment.weather
+    || !environment.season
+    || !environment.localTime
+    || !environment.mapMode
+    || !Number.isFinite(environment.temperatureC)
+  ) {
+    return true;
+  }
+  return board.entities.some(entity => {
+    if (entity.category !== "unit" && entity.category !== "civilian") return false;
+    const profile = entity.profile;
+    return !profile
+      || !profile.username
+      || !profile.role
+      || !profile.status
+      || !profile.lastSeen
+      || !Array.isArray(profile.experience)
+      || profile.walletMinor === undefined
+      || profile.maximumRecordedWalletMinor === undefined
+      || !profile.accent;
+  });
+}
+
 export function normalizeBoardPresentation(board: BoardState): BoardState {
   const defaultEnvironment = createDefaultEnvironment();
   const mapMode = board.world?.mapProvider === "google"
