@@ -117,7 +117,8 @@ function normalizePeople(body: unknown): TelegramPerson[] {
     const last = stringValue(person.last_name) ?? stringValue(person.lastName);
     const username = stringValue(person.username);
     const combinedName = [first, last].filter(Boolean).join(" ");
-    const displayName = stringValue(person.displayName) ?? stringValue(person.name) ?? combinedName || username || `Telegram person ${index + 1}`;
+    const fallbackName = combinedName || username || `Telegram person ${index + 1}`;
+    const displayName = stringValue(person.displayName) ?? stringValue(person.name) ?? fallbackName;
     const avatarUrl = stringValue(person.avatarUrl) ?? stringValue(person.photo_url);
     const biography = stringValue(person.bio);
     return {
