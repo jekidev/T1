@@ -17,14 +17,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // Embedded basic-auth credentials in the URL break in-page fetch() for relative
-      // API calls. Strip them and rely on the browser's cached auth for the same host.
-      const url = new URL(window.location.href);
-      if (url.username || url.password) {
-        url.username = '';
-        url.password = '';
-        window.location.replace(url.toString());
-      }
+      // An exposed Devin tunnel may embed basic-auth credentials in the URL.
+      // Browsers block in-page fetch() for relative URLs when the document's
+      // base URL contains credentials. Reload once to the same URL without
+      // credentials so the browser can use its cached basic-auth token for all
+      // subsequent API calls without showing a login prompt.
+      (function () {
+        try {
+          const url = new URL(document.baseURI || window.location.href);
+          if (url.username || url.password) {
+            url.username = '';
+            url.password = '';
+            window.location.replace(url.toString());
+          }
+        } catch {}
+      })();
     </script>
   </head>
   <body>
