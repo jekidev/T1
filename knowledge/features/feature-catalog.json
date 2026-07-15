@@ -1,125 +1,307 @@
 {
-  "version": 1,
+  "generated_at": "2026-07-15T00:55:57.439778+00:00",
   "features": [
     {
       "id": "F-001",
       "name": "Immutable source archive",
+      "status": "implemented-in-package",
       "priority": "critical",
       "module": "knowledge/sources/original",
-      "description": "Preserve every uploaded document byte-for-byte with SHA-256 provenance; duplicates remain present.",
-      "acceptance_criteria": ["All source hashes validate", "No source artifact is silently replaced or deleted"]
+      "description": "Preserve every uploaded document byte-for-byte with SHA-256 provenance. Nothing is deleted or overwritten.",
+      "source_basis": [
+        "all uploaded documents"
+      ],
+      "acceptance_criteria": [
+        "All source hashes validate",
+        "Duplicate files remain present",
+        "Manifest maps original names to hashes"
+      ]
     },
     {
       "id": "F-002",
-      "name": "Page-aware PDF extraction",
+      "name": "Page-aware extraction",
+      "status": "implemented-in-package",
       "priority": "critical",
       "module": "scripts/knowledge_indexer.py",
-      "description": "Extract source text by page and retain source/page provenance for every RAG record.",
-      "acceptance_criteria": ["Every readable PDF produces extracted Markdown", "Every chunk has a page number"]
+      "description": "Extract PDF text by page into Markdown and structured metadata while retaining page provenance.",
+      "source_basis": [
+        "RAG and source-preservation discussions"
+      ],
+      "acceptance_criteria": [
+        "Every readable PDF has an extracted Markdown file",
+        "Chunk records contain page numbers"
+      ]
     },
     {
       "id": "F-003",
-      "name": "Modular RAG chunk index",
+      "name": "Modular chunk index",
+      "status": "implemented-in-package",
       "priority": "critical",
-      "module": "knowledge/rag",
-      "description": "Turn mixed transcripts into deterministic chunks with document hash, tags, risk tier and canonical duplicate identity.",
-      "acceptance_criteria": ["JSONL indexes parse", "Chunk IDs are unique", "Every chunk includes provenance"]
+      "module": "knowledge/rag/all-chunks.jsonl",
+      "description": "Split semi-random transcripts into reusable chunks with tags, risk tier, source hash, page, and canonical duplicate ID.",
+      "source_basis": [
+        "Request to index semi-random knowledge into modular features, playbooks, and RAG"
+      ],
+      "acceptance_criteria": [
+        "JSONL parses",
+        "Every chunk has provenance",
+        "Chunk IDs are deterministic"
+      ]
     },
     {
       "id": "F-004",
       "name": "Safe default retrieval",
+      "status": "implemented-in-package",
       "priority": "critical",
       "module": "knowledge/rag/safe-index.jsonl",
-      "description": "Use safe and defensive content by default while retaining restricted material in a separate controlled-review index.",
-      "acceptance_criteria": ["Default query excludes quarantined chunks", "Quarantine requires an explicit flag"]
+      "description": "Default RAG excludes prompt-injection and operationally harmful content while retaining it in the immutable archive and quarantine index.",
+      "source_basis": [
+        "Mixed prompt experiments and operational material in source corpus"
+      ],
+      "acceptance_criteria": [
+        "Safe query CLI searches safe index by default",
+        "Quarantine requires explicit flag"
+      ]
     },
     {
       "id": "F-005",
       "name": "Prompt-injection quarantine",
+      "status": "implemented-in-package",
       "priority": "critical",
-      "module": "knowledge/config/retrieval-policy.json",
-      "description": "Treat persona-lock, auto-reframe, never-refuse and safeguard-bypass text as untrusted research data, never as executable instructions.",
-      "acceptance_criteria": ["Injection-like chunks are classified", "Archived prompt text cannot override application instructions"]
+      "module": "knowledge/rag/quarantine-index.jsonl",
+      "description": "Identify persona-lock, never-refuse, auto-reframe, safety-bypass, and instruction-hijacking material as data rather than executable instructions.",
+      "source_basis": [
+        "Nyx persona and auto-reframe documents"
+      ],
+      "acceptance_criteria": [
+        "Injection-like chunks are tagged prompt_injection",
+        "Retrieval policy marks source text non-authoritative"
+      ]
     },
     {
       "id": "F-006",
       "name": "Deduplication without deletion",
+      "status": "implemented-in-package",
       "priority": "high",
       "module": "knowledge/rag/deduplication.json",
-      "description": "Group exact and near duplicates for retrieval efficiency while preserving all originals and aliases.",
-      "acceptance_criteria": ["Exact duplicates are grouped by SHA-256", "All duplicate source files remain in the archive"]
+      "description": "Group exact and near-duplicate documents/chunks while preserving every original artifact.",
+      "source_basis": [
+        "Existing T1 SHA-256 RAG sync and user requirement not to delete anything"
+      ],
+      "acceptance_criteria": [
+        "Exact duplicates grouped by SHA-256",
+        "Canonical IDs assigned",
+        "No source file removed"
+      ]
     },
     {
       "id": "F-007",
-      "name": "Feature and roadmap extraction",
+      "name": "Feature catalog",
+      "status": "implemented-in-package",
       "priority": "high",
-      "module": "knowledge/features",
-      "description": "Convert recurring ideas, implementation notes and TODOs into modular feature cards with acceptance criteria.",
-      "acceptance_criteria": ["Feature IDs are stable", "Features map back to source documents"]
+      "module": "knowledge/features/feature-catalog.json",
+      "description": "Convert recurring ideas and roadmap items into modular feature cards with priority, module, source basis, and acceptance criteria.",
+      "source_basis": [
+        "Game roadmaps, system summaries, missing-feature lists"
+      ],
+      "acceptance_criteria": [
+        "Feature IDs are unique",
+        "Each feature maps to sources and implementation area"
+      ]
     },
     {
       "id": "F-008",
-      "name": "Development playbook library",
+      "name": "Playbook library",
+      "status": "implemented-in-package",
       "priority": "high",
       "module": "knowledge/playbooks",
-      "description": "Document repeatable workflows for ingestion, retrieval, feature extraction, blue-team scenarios and repository changes.",
-      "acceptance_criteria": ["Each playbook defines inputs, procedure, outputs and validation"]
+      "description": "Turn repeated workflows into operational development playbooks: ingestion, retrieval, feature extraction, blue-team scenarios, and repository changes.",
+      "source_basis": [
+        "README-before-changes workflows and implementation guidance"
+      ],
+      "acceptance_criteria": [
+        "Playbooks are modular",
+        "Each has inputs, steps, outputs, and validation"
+      ]
     },
     {
       "id": "F-009",
       "name": "Blue-team simulation knowledge",
+      "status": "indexed-safe",
       "priority": "high",
       "module": "knowledge/rag/safe-index.jsonl",
-      "description": "Index detection, investigation, risk, legal/compliance and defensive simulation material for safe scenario generation.",
-      "acceptance_criteria": ["Defensive chunks are retrievable", "Operational evasion details remain quarantined"]
+      "description": "Index detection, investigation, suspicion, legal/compliance, and defensive simulation material for safe scenario generation.",
+      "source_basis": [
+        "Blue Team AI, detection and police-method sections"
+      ],
+      "acceptance_criteria": [
+        "Defensive chunks tagged blue-team",
+        "Operational evasion details remain restricted"
+      ]
     },
     {
       "id": "F-010",
       "name": "Core strategy simulation model",
+      "status": "design-extracted",
       "priority": "high",
-      "module": "artifacts/command-sim",
-      "description": "Reusable game-state model for fictional crews, territories, turn loop, reputation, health, economy, events and AI personalities.",
-      "acceptance_criteria": ["Mechanics are separated from RAG content", "Defaults are fictional and non-operational"]
+      "module": "future: artifacts/command-sim",
+      "description": "Game-state model covering crews, territories, turn loop, reputation, risk, health, economy, events, and AI personalities.",
+      "source_basis": [
+        "Game development transcripts and RAG document index"
+      ],
+      "acceptance_criteria": [
+        "Schema is separated from content",
+        "Game mechanics use fictionalized and non-operational abstractions"
+      ]
     },
     {
       "id": "F-011",
-      "name": "Dynamic narrative and case-pattern engine",
+      "name": "Dynamic narrative engine",
+      "status": "design-extracted",
       "priority": "medium",
-      "module": "future:narrative/events",
-      "description": "Generate fictional story events from safe case patterns and current simulation state with source provenance.",
-      "acceptance_criteria": ["Events include provenance", "Generated text contains no actionable harmful instructions"]
+      "module": "future: narrative/events",
+      "description": "Generate story events from indexed case patterns and game state, using safe abstractions and provenance.",
+      "source_basis": [
+        "RAG narrative generation roadmap"
+      ],
+      "acceptance_criteria": [
+        "Narratives cite source categories",
+        "No actionable criminal instructions are emitted"
+      ]
     },
     {
       "id": "F-012",
-      "name": "AI change-control workflow",
+      "name": "Risk and suspicion engine",
+      "status": "design-extracted",
       "priority": "high",
-      "module": "README_BEFORE_ANY_CHANGES_KNOWLEDGE.md",
-      "description": "Require developers and AI agents to classify changes, preserve originals, validate indexes and document provenance before commit.",
-      "acceptance_criteria": ["Validation runs before merge", "PR summary states source IDs and generated outputs"]
+      "module": "future: simulation/risk",
+      "description": "Generic risk-scoring and detection-threshold mechanics for strategy simulations.",
+      "source_basis": [
+        "Blue Team action logic, OPSEC/suspicion mechanics"
+      ],
+      "acceptance_criteria": [
+        "Parameters are fictionalized",
+        "Defensive detection is emphasized over evasion"
+      ]
     },
     {
       "id": "F-013",
-      "name": "Hourly everyday-wisdom heads-up",
-      "priority": "high",
-      "module": "artifacts/api-server/src/lib/llm-heads-up.ts",
-      "description": "Select source material from rag/wisdom/common/everyday tips and generate an hourly LLM notification with source provenance.",
-      "acceptance_criteria": ["PDF, DOCX, DOC, TXT, TEXT and MD sources are supported", "The scheduler defaults to one hour", "A local excerpt fallback exists when the external LLM is unavailable"]
+      "name": "NPC personality and behavior",
+      "status": "design-extracted",
+      "priority": "medium",
+      "module": "future: simulation/agents",
+      "description": "Reusable personality archetypes and behavior policies for AI-controlled crews and investigators.",
+      "source_basis": [
+        "AI personality, psychology, and behavior notes"
+      ],
+      "acceptance_criteria": [
+        "No unsupported psychological certainty",
+        "Behavior parameters are configurable"
+      ]
     },
     {
       "id": "F-014",
-      "name": "Light Balanced Uber user modes",
-      "priority": "high",
-      "module": "artifacts/command-sim/src/lib/llm-mode.ts",
-      "description": "Give the user explicit control over proactive LLM behavior, from quiet hourly wisdom to active game commentary.",
-      "acceptance_criteria": ["Mode persists in local storage", "Advisor prompts reflect the selected mode", "Light mode suppresses behavior commentary"]
+      "name": "Economic simulation abstraction",
+      "status": "design-extracted",
+      "priority": "medium",
+      "module": "future: simulation/economy",
+      "description": "Abstract cash-flow, capacity, demand, costs, and anomaly-detection mechanics without real-world laundering instructions.",
+      "source_basis": [
+        "Economic simulation and financial-risk notes"
+      ],
+      "acceptance_criteria": [
+        "Uses fictional units/defaults",
+        "Includes anomaly and compliance counterplay"
+      ]
     },
     {
       "id": "F-015",
-      "name": "Uber review-only PR proposal generator",
+      "name": "Intelligence and information system",
+      "status": "design-extracted",
+      "priority": "medium",
+      "module": "future: simulation/intelligence",
+      "description": "Game-level information gathering, uncertainty, fog-of-war, and counter-intelligence as abstract mechanics.",
+      "source_basis": [
+        "Intelligence/espionage roadmap"
+      ],
+      "acceptance_criteria": [
+        "No real-world surveillance procedures",
+        "Outputs are probabilistic game-state changes"
+      ]
+    },
+    {
+      "id": "F-016",
+      "name": "Recruitment and loyalty simulation",
+      "status": "design-extracted",
+      "priority": "medium",
+      "module": "future: simulation/recruitment",
+      "description": "Fictional NPC recruitment, loyalty, skill, morale, and attrition mechanics.",
+      "source_basis": [
+        "Active recruitment and J-system sections"
+      ],
+      "acceptance_criteria": [
+        "No targeting of vulnerable real people",
+        "Influence mechanics remain fictional and consent-aware"
+      ]
+    },
+    {
+      "id": "F-017",
+      "name": "Territory and map layer",
+      "status": "design-extracted",
+      "priority": "medium",
+      "module": "future: command-sim/map",
+      "description": "Visual map and territory-control layer with configurable fictional zones and risk/reward profiles.",
+      "source_basis": [
+        "10 territories, real-time map, territory defense roadmap"
+      ],
+      "acceptance_criteria": [
+        "Supports fictional maps",
+        "No real sensitive-location catalog"
+      ]
+    },
+    {
+      "id": "F-018",
+      "name": "Case-pattern library",
+      "status": "design-extracted",
+      "priority": "medium",
+      "module": "knowledge/cases",
+      "description": "Structured, cited case patterns for defensive analysis and narrative inspiration, separated from operational instructions.",
+      "source_basis": [
+        "74+ cases and case library references"
+      ],
+      "acceptance_criteria": [
+        "Every case has source/provenance fields",
+        "Personal data minimized"
+      ]
+    },
+    {
+      "id": "F-019",
+      "name": "AI change-control workflow",
+      "status": "implemented-in-package",
       "priority": "high",
-      "module": "rag/Code/LLM_scripts",
-      "description": "Reverse engineer relevant source and game-state context to create throttled, model-grouped potential PR scripts that preserve game continuation.",
-      "acceptance_criteria": ["Proposals are grouped by model", "Artifacts are never auto-executed or auto-committed", "Every proposal includes tests, rollback and state-continuation notes"]
+      "module": "README_BEFORE_ANY_CHANGES_KNOWLEDGE.md",
+      "description": "Require AI/developers to classify a request as data, code, feature, playbook, or quarantined source before making changes.",
+      "source_basis": [
+        "README_BEFORE_ANY_CHANGES concepts"
+      ],
+      "acceptance_criteria": [
+        "Change includes plan, provenance, validation, and non-deletion check"
+      ]
+    },
+    {
+      "id": "F-020",
+      "name": "Spec and issue generator",
+      "status": "planned",
+      "priority": "medium",
+      "module": "future: scripts/generate-specs",
+      "description": "Generate Spec-Kit-style feature specs and GitHub issue drafts from feature cards.",
+      "source_basis": [
+        "User request for modular features, TODOs, and GitHub integration"
+      ],
+      "acceptance_criteria": [
+        "Generated specs reference feature IDs",
+        "No issue is created automatically without explicit approval"
+      ]
     }
   ]
 }
