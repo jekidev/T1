@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ObservabilityConsent } from "@/components/observability-consent";
 import { PreflightGate } from "@/components/workspace-preflight";
+import { BoardPresentationMigration } from "@/components/board-presentation-migration";
 import NotFound from "@/pages/not-found";
 import ScenarioListShell from "@/pages/scenario-list-shell";
 import BoardPage from "@/pages/board";
@@ -18,7 +19,12 @@ import { Route, Switch, Router as WouterRouter } from "wouter";
 const queryClient = new QueryClient();
 
 function GuardedBoard() {
-  return <PreflightGate><BoardPage /></PreflightGate>;
+  return (
+    <PreflightGate>
+      <BoardPresentationMigration />
+      <BoardPage />
+    </PreflightGate>
+  );
 }
 
 function Router() {
