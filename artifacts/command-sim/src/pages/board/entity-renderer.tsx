@@ -1,17 +1,17 @@
-import { BoardEntity, EntityTemplate } from "@/lib/game";
+import { useState } from "react";
+import type { BoardEntity } from "@/lib/game";
 import { getEntityTemplate } from "@/lib/game";
-import { Badge } from "@/components/ui/badge";
-import { Shield, ShieldAlert, AlertTriangle, Users, MapPin, Package, Eye, Radio, Zap } from "lucide-react";
+import { Shield, AlertTriangle, Users, MapPin, Package, Eye, Radio, Zap } from "lucide-react";
 
-export function EntityIcon({ category, faction, className }: { category: string, faction: string, className?: string }) {
+export function EntityIcon({ category, className }: { category: string; className?: string }) {
   let Icon = Package;
-  switch(category) {
-    case 'unit': Icon = Shield; break;
-    case 'civilian': Icon = Users; break;
-    case 'location': Icon = MapPin; break;
-    case 'surveillance': Icon = Eye; break;
-    case 'vehicle': Icon = Zap; break;
-    case 'event': Icon = Radio; break;
+  switch (category) {
+    case "unit": Icon = Shield; break;
+    case "civilian": Icon = Users; break;
+    case "location": Icon = MapPin; break;
+    case "surveillance": Icon = Eye; break;
+    case "vehicle": Icon = Zap; break;
+    case "event": Icon = Radio; break;
   }
   return <Icon className={className} />;
 }
@@ -19,46 +19,88 @@ export function EntityIcon({ category, faction, className }: { category: string,
 interface RenderedEntityProps {
   entity: BoardEntity;
   selected: boolean;
-  onPointerDown: (e: React.PointerEvent) => void;
+  onPointerDown: (event: React.PointerEvent) => void;
 }
 
 export function RenderedEntity({ entity, selected, onPointerDown }: RenderedEntityProps) {
+  const [hovered, setHovered] = useState(false);
   const template = getEntityTemplate(entity.templateId);
   if (!template) return null;
 
-  // Convert 0-1000 to percentages
   const left = `${entity.x / 10}%`;
   const top = `${entity.y / 10}%`;
-  
-  // Visuals based on faction
-  let colorClass = "border-zinc-500 bg-zinc-800 text-zinc-300";
-  if (entity.faction === "police") colorClass = "border-faction-police bg-faction-police/20 text-blue-100 shadow-[0_0_10px_rgba(0,100,255,0.2)]";
-  if (entity.faction === "criminal") colorClass = "border-faction-criminal bg-faction-criminal/20 text-red-100 shadow-[0_0_10px_rgba(255,0,0,0.2)]";
-  if (entity.faction === "neutral") colorClass = "border-faction-neutral bg-faction-neutral/20 text-amber-100";
+  const isPerson = entity.category === "unit" || entity.category === "civilian";
+  const accent = entity.profile?.accent ?? factionAccent(entity.faction);
+  const active = selected || hovered;
 
   return (
     <div
-      className={`absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing hover-elevate touch-none ${selected ? 'ring-2 ring-white ring-offset-2 ring-offset-background z-50' : 'z-10'}`}
+      className={`absolute flex touch-none select-none flex-col items-center justify-center transition-[filter,opacity] duration-150 ${active ? "z-50 drop-shadow-[0_0_12px_rgba(255,255,255,0.36)]" : "z-10"} ${selected ? "cursor-grabbing" : "cursor-grab"}`}
       style={{
         left,
         top,
-        transform: `translate(-50%, -50%) rotate(${entity.rotation}deg) scale(${entity.scale})`,
-        zIndex: entity.zIndex + (selected ? 100 : 0)
+        transform: `translate(-50%, -50%) rotate(${entity.rotation}deg) scale(${entity.scale * (hovered && !selected ? 1.08 : 1)})`,
+        zIndex: entity.zIndex + (active ? 100 : 0),
       }}
       onPointerDown={onPointerDown}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
       data-entity-id={entity.id}
+      title={`${entity.label}${entity.profile?.role ? ` · ${entity.profile.role}` : ""}`}
+      role="button"
+      aria-pressed={selected}
+      aria-label={`Select ${entity.label}`}
     >
-      <div className={`w-8 h-8 rounded flex items-center justify-center border-2 backdrop-blur-sm ${colorClass}`}>
-        <EntityIcon category={entity.category} faction={entity.faction} className="w-4 h-4" />
+      {(selected || hovered) && (
+        <div
+          className="pointer-events-none absolute h-12 w-12 rounded-full border opacity-80 blur-[0.2px]"
+          style={{ borderColor: accent, boxShadow: `0 0 18px ${accent}88, inset 0 0 12px ${accent}35` }}
+        />
+      )}
+
+      <div
+        className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border-2 bg-background/80 text-foreground backdrop-blur-sm transition-all duration-150"
+        style={{
+          borderColor: accent,
+          boxShadow: active ? `0 0 16px ${accent}80, inset 0 0 12px ${accent}25` : `0 5px 12px rgba(0,0,0,0.28)`,
+        }}
+      >
+        {isPerson && entity.profile?.avatarUrl ? (
+          <img src={entity.profile.avatarUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+        ) : (
+          <EntityIcon category={entity.category} className="h-4 w-4" />
+        )}
+
+        {isPerson && entity.profile?.status && entity.profile.status !== "unknown" && (
+          <span
+            className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-background ${statusClass(entity.profile.status)}`}
+            aria-label={entity.profile.status}
+          />
+        )}
       </div>
-      <div className="mt-1 bg-background/80 px-1.5 py-0.5 rounded text-[9px] font-mono whitespace-nowrap border border-white/10 text-white shadow-sm pointer-events-none backdrop-blur-sm">
+
+      <div className="pointer-events-none mt-1 max-w-36 truncate rounded-md border border-white/10 bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-white shadow-sm backdrop-blur-sm">
         {entity.label}
+        {hovered && entity.profile?.role ? <span className="ml-1 text-muted-foreground">· {entity.profile.role}</span> : null}
       </div>
+
       {entity.attributes.risk > 70 && (
-        <div className="absolute -top-2 -right-2 text-destructive bg-background rounded-full">
-          <AlertTriangle className="w-3 h-3" />
+        <div className="absolute -right-2 -top-2 rounded-full bg-background text-destructive shadow-md">
+          <AlertTriangle className="h-3 w-3" />
         </div>
       )}
     </div>
   );
+}
+
+function factionAccent(faction: BoardEntity["faction"]): string {
+  if (faction === "police") return "#4f8cff";
+  if (faction === "criminal") return "#ff5c6c";
+  return "#f4b860";
+}
+
+function statusClass(status: NonNullable<BoardEntity["profile"]>["status"]): string {
+  if (status === "online") return "bg-emerald-400 shadow-[0_0_7px_rgba(52,211,153,0.9)]";
+  if (status === "busy") return "bg-amber-400 shadow-[0_0_7px_rgba(251,191,36,0.8)]";
+  return "bg-slate-500";
 }

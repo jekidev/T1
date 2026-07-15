@@ -29,7 +29,7 @@ export const DEFAULT_WORLD_CONFIG: WorldConfig = {
   timezone: 'Europe/Copenhagen',
   latitude: 55.6761,
   longitude: 12.5683,
-  mapProvider: 'google',
+  mapProvider: 'openstreetmap',
 };
 
 export function loadWorldConfig(): WorldConfig {

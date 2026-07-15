@@ -1,0 +1,67 @@
+services:
+  network-gate:
+    build:
+      context: .
+      dockerfile: Dockerfile.network-gate
+    restart: unless-stopped
+    environment:
+      NETWORK_GATE_INFRA_TOKEN: ${NETWORK_GATE_INFRA_TOKEN:?set NETWORK_GATE_INFRA_TOKEN}
+      NETWORK_GATE_MODEL_DOMAINS: ${NETWORK_GATE_MODEL_DOMAINS:-openrouter.ai,api.openai.com,api.anthropic.com,api.deepseek.com,generativelanguage.googleapis.com}
+      NETWORK_GATE_INFRA_DOMAINS: ${NETWORK_GATE_INFRA_DOMAINS:-github.com,api.github.com,objects.githubusercontent.com,raw.githubusercontent.com,codeload.github.com}
+    volumes:
+      - network-policies:/network-policies
+    networks:
+      - agent-internal
+      - egress
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+
+  coding-agent-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      network-gate:
+        condition: service_healthy
+    environment:
+      CODING_AGENT_WORKER_TOKEN: ${CODING_AGENT_WORKER_TOKEN:?set CODING_AGENT_WORKER_TOKEN}
+      CODING_AGENT_REPOSITORY_URL: ${CODING_AGENT_REPOSITORY_URL:?set CODING_AGENT_REPOSITORY_URL}
+      CODING_AGENT_GITHUB_REPOSITORY: ${CODING_AGENT_GITHUB_REPOSITORY:?set CODING_AGENT_GITHUB_REPOSITORY}
+      CODING_AGENT_GITHUB_TOKEN: ${CODING_AGENT_GITHUB_TOKEN:?set a GitHub token without merge/admin scope}
+      NETWORK_GATE_INFRA_TOKEN: ${NETWORK_GATE_INFRA_TOKEN:?set NETWORK_GATE_INFRA_TOKEN}
+      NETWORK_GATE_MODEL_DOMAINS: ${NETWORK_GATE_MODEL_DOMAINS:-openrouter.ai,api.openai.com,api.anthropic.com,api.deepseek.com,generativelanguage.googleapis.com}
+      CODING_AGENT_OPENHANDS_MODEL: ${CODING_AGENT_OPENHANDS_MODEL:-openrouter/openai/gpt-5-mini}
+      CODING_AGENT_AIDER_MODEL: ${CODING_AGENT_AIDER_MODEL:-openrouter/openai/gpt-5-mini}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    volumes:
+      - coding-agent-work:/work
+      - network-policies:/network-policies
+    networks:
+      - agent-internal
+    ports:
+      - "127.0.0.1:${CODING_AGENT_WORKER_PORT:-8787}:8787"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: ${CODING_AGENT_WORKER_MEMORY:-8g}
+    cpus: ${CODING_AGENT_WORKER_CPUS:-4}
+
+networks:
+  agent-internal:
+    internal: true
+  egress: {}
+
+volumes:
+  coding-agent-work: {}
+  network-policies: {}

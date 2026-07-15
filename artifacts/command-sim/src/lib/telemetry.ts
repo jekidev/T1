@@ -1,4 +1,10 @@
 import { useBoardStore } from '@/lib/game';
+import {
+  getReplayConsent,
+  installReplayPrivacyMarkers,
+  startSessionReplay,
+  stopSessionReplay,
+} from '@/lib/session-replay';
 
 type TelemetryLevel = 'debug' | 'info' | 'warn' | 'error';
 type TelemetrySource = 'browser' | 'game';
@@ -18,7 +24,7 @@ let lastBoardSignature = '';
 
 function serializable(value: unknown): unknown {
   try {
-    return JSON.parse(JSON.stringify(value));
+    return redactValue(JSON.parse(JSON.stringify(value)), 0);
   } catch {
     return { serializationError: true };
   }
@@ -40,7 +46,11 @@ function flush() {
 }
 
 export function trackTelemetry(event: TelemetryInput) {
-  queue.push({ ...event, data: serializable(event.data) });
+  queue.push({
+    ...event,
+    message: redactText(event.message).slice(0, 4_000),
+    data: serializable(event.data),
+  });
   if (queue.length >= 25) {
     flush();
     return;
@@ -48,13 +58,48 @@ export function trackTelemetry(event: TelemetryInput) {
   if (flushTimer === null) flushTimer = window.setTimeout(flush, 750);
 }
 
+export async function withClientSpan<T>(
+  name: string,
+  data: Record<string, unknown>,
+  operation: () => Promise<T> | T,
+): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    const result = await operation();
+    trackTelemetry({
+      source: 'browser',
+      level: 'info',
+      type: name,
+      message: `${name} completed`,
+      data: { ...data, durationMs: Math.round((performance.now() - startedAt) * 10) / 10 },
+    });
+    return result;
+  } catch (error) {
+    trackTelemetry({
+      source: 'browser',
+      level: 'error',
+      type: name,
+      message: `${name} failed`,
+      data: {
+        ...data,
+        durationMs: Math.round((performance.now() - startedAt) * 10) / 10,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
+    throw error;
+  }
+}
+
 function sanitizeElement(element: Element, depth = 0): unknown {
   if (depth > 4) return undefined;
+  if (element.matches('.monaco-editor, [data-replay-block], [data-secret], [data-token], [data-api-key]')) {
+    return { tag: element.tagName.toLowerCase(), blocked: true };
+  }
   const attributes = Array.from(element.attributes)
-    .filter((attribute) => !['value', 'data-token', 'data-secret'].includes(attribute.name.toLowerCase()))
+    .filter((attribute) => !['value', 'data-token', 'data-secret', 'data-api-key'].includes(attribute.name.toLowerCase()))
     .slice(0, 12)
     .reduce<Record<string, string>>((result, attribute) => {
-      result[attribute.name] = attribute.value.slice(0, 200);
+      result[attribute.name] = redactText(attribute.value).slice(0, 200);
       return result;
     }, {});
 
@@ -64,7 +109,7 @@ function sanitizeElement(element: Element, depth = 0): unknown {
     className: typeof element.className === 'string' ? element.className.slice(0, 300) : undefined,
     role: element.getAttribute('role') ?? undefined,
     ariaLabel: element.getAttribute('aria-label') ?? undefined,
-    text: element.children.length === 0 ? (element.textContent ?? '').trim().slice(0, 300) : undefined,
+    text: element.children.length === 0 ? redactText((element.textContent ?? '').trim()).slice(0, 300) : undefined,
     attributes,
     children: Array.from(element.children).slice(0, 20).map((child) => sanitizeElement(child, depth + 1)),
   };
@@ -93,6 +138,8 @@ export function captureDomSnapshot() {
 export function installTelemetry() {
   if (installed || typeof window === 'undefined') return () => undefined;
   installed = true;
+  installReplayPrivacyMarkers();
+  if (getReplayConsent() === 'granted') void startSessionReplay();
 
   const originalWarn = console.warn.bind(console);
   const originalError = console.error.bind(console);
@@ -110,9 +157,10 @@ export function installTelemetry() {
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const startedAt = performance.now();
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const url = sanitizeUrl(rawUrl);
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
-    const isTelemetryTransport = url.includes('/api/observability/events');
+    const isTelemetryTransport = rawUrl.includes('/api/observability/events') || rawUrl.includes('/api/observability/replay');
 
     try {
       const response = await originalFetch(input, init);
@@ -146,7 +194,7 @@ export function installTelemetry() {
       level: 'error',
       type: 'window.error',
       message: event.message,
-      data: { filename: event.filename, line: event.lineno, column: event.colno, stack: event.error?.stack },
+      data: { filename: sanitizeUrl(event.filename), line: event.lineno, column: event.colno, stack: event.error?.stack },
     });
   };
 
@@ -170,8 +218,8 @@ export function installTelemetry() {
       zones: board.zones.length,
       phases: board.phases.length,
       currentPhaseId: board.currentPhaseId,
-      timeline: board.timeline.length,
-      moveLog: board.moveLog.length,
+      timeline: board.timelineEvents.length,
+      moveLog: board.moveHistory.length,
       selectedIds: state.selectedIds,
     });
     if (signature === lastBoardSignature) return;
@@ -191,11 +239,12 @@ export function installTelemetry() {
     level: 'info',
     type: 'session.started',
     message: 'Browser telemetry initialized',
-    data: { path: window.location.pathname, userAgent: navigator.userAgent },
+    data: { path: window.location.pathname, userAgent: navigator.userAgent, replayConsent: getReplayConsent() },
   });
 
   return () => {
     unsubscribe();
+    stopSessionReplay();
     window.removeEventListener('error', onError);
     window.removeEventListener('unhandledrejection', onUnhandledRejection);
     console.warn = originalWarn;
@@ -203,4 +252,35 @@ export function installTelemetry() {
     window.fetch = originalFetch;
     installed = false;
   };
+}
+
+function redactValue(value: unknown, depth: number): unknown {
+  if (depth > 8) return '[TRUNCATED]';
+  if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') return value;
+  if (typeof value === 'string') return redactText(value).slice(0, 10_000);
+  if (Array.isArray(value)) return value.slice(0, 1_000).map(item => redactValue(item, depth + 1));
+  if (typeof value !== 'object') return String(value);
+  const output: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    output[key] = /(password|secret|token|authorization|cookie|api[-_.]?key|\.env|private[-_.]?key)/i.test(key)
+      ? '[REDACTED]'
+      : redactValue(entry, depth + 1);
+  }
+  return output;
+}
+
+function redactText(value: string): string {
+  return value
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/\b(?:sk|pk)[-_][A-Za-z0-9_-]{12,}\b/g, '[REDACTED_KEY]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED_TOKEN]');
+}
+
+function sanitizeUrl(value: string): string {
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.origin === window.location.origin ? url.pathname : `${url.origin}${url.pathname}`;
+  } catch {
+    return value.split('?', 1)[0] ?? '';
+  }
 }

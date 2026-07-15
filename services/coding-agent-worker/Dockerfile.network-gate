@@ -1,0 +1,21 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NETWORK_GATE_POLICY_ROOT=/network-policies \
+    NETWORK_GATE_PORT=8888
+
+RUN useradd --create-home --uid 10002 --shell /usr/sbin/nologin network-gate \
+    && mkdir -p /app /network-policies \
+    && chown -R network-gate:network-gate /app /network-policies
+
+COPY --chown=network-gate:network-gate network_gate.py /app/network_gate.py
+
+USER network-gate
+WORKDIR /app
+EXPOSE 8888
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD python -c "import socket; s=socket.create_connection(('127.0.0.1',8888),3); s.close()"
+
+CMD ["python", "/app/network_gate.py"]

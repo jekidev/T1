@@ -7,3 +7,6 @@ export * from './tutorialScenario';
 export * from './generatedGameSchema';
 export * from './scenarioCompiler';
 export * from './simulationEngine';
+export * from './teamPulse';
+export * from './sceneEnvironment';
+export * from './presentationMigration';

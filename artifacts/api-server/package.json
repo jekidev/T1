@@ -7,11 +7,18 @@
     "dev": "pnpm run build && cd ../.. && NODE_ENV=development node --enable-source-maps artifacts/api-server/dist/index.mjs",
     "build": "node ./build.mjs",
     "start": "cd ../.. && node --enable-source-maps artifacts/api-server/dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test src/lib/network-access.test.ts src/lib/model-network-guard.test.ts src/routes/network-access.test.ts"
   },
   "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "0.220.0",
+    "@opentelemetry/sdk-node": "0.220.0",
     "@workspace/api-zod": "workspace:*",
+    "@workspace/asset-pipeline": "workspace:*",
+    "@workspace/coding-agent": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/geo-world": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
@@ -27,6 +34,7 @@
     "esbuild": "0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13.1.3",
-    "thread-stream": "3.1.0"
+    "thread-stream": "3.1.0",
+    "tsx": "catalog:"
   }
 }

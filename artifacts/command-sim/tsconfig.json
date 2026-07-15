@@ -17,6 +17,18 @@
   "references": [
     {
       "path": "../../lib/api-client-react"
+    },
+    {
+      "path": "../../lib/strategy-sim"
+    },
+    {
+      "path": "../../lib/asset-pipeline"
+    },
+    {
+      "path": "../../lib/geo-world"
+    },
+    {
+      "path": "../../lib/coding-agent"
     }
   ]
 }

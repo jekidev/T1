@@ -11,6 +11,18 @@ out-tsc
 # dependencies
 node_modules
 
+# Runtime-generated data
+/data/asset-pipeline/
+/data/coding-agent/
+/data/session-replay/
+/data/world/
+/services/asset-worker/work/
+
+# Python worker caches
+__pycache__/
+*.py[cod]
+.venv/
+
 # IDEs and editors
 /.idea
 .project

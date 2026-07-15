@@ -1,12 +1,11 @@
 import { nanoid } from "nanoid";
-import type { BoardState, FactionState, SimulationState, TimelineEvent } from "./types";
-
-export interface PlayerTurnAction {
-  type: "invest" | "gather_intelligence" | "reduce_pressure" | "expand_influence" | "train" | "wait";
-  factionId?: string;
-  skillId?: string;
-  amount?: number;
-}
+import {
+  applySyndicateCommand,
+  selectDeterministicStrategy,
+  type SyndicateWorldState,
+} from "@workspace/strategy-sim";
+import type { BoardState, FactionState, PlayerTurnAction, SimulationState, TimelineEvent } from "./types";
+import { applyPlayerTurnToTeamDynamics, ensureTeamDynamics } from "./teamPulse";
 
 export interface TurnResolution {
   board: BoardState;
@@ -40,6 +39,7 @@ function updateFaction(faction: FactionState, action: PlayerTurnAction | undefin
     if (action.type === "gather_intelligence") { treasury -= amount * 500; intelligence += 5; suspicion += 2; }
     if (action.type === "reduce_pressure") { treasury -= amount * 750; suspicion -= 5; legitimacy += 2; }
     if (action.type === "expand_influence") { treasury -= amount * 900; legitimacy += faction.faction === "criminal" ? -1 : 2; suspicion += faction.faction === "criminal" ? 4 : 1; }
+    if (action.type === "train") cohesion += 2;
   }
 
   const upkeep = faction.personnel * 120;
@@ -58,10 +58,38 @@ function updateFaction(faction: FactionState, action: PlayerTurnAction | undefin
   };
 }
 
+function advanceSyndicateWorld(world: SyndicateWorldState | undefined, nextTurn: number): SyndicateWorldState | undefined {
+  if (!world) return undefined;
+  let next = applySyndicateCommand(world, {
+    type: "advance_tick",
+    commandId: `board-turn-${nextTurn}-advance`,
+    tick: world.tick,
+    ticks: 4,
+  });
+  if (nextTurn % 6 === 0) {
+    for (const syndicate of [...next.syndicates].sort((a, b) => a.id.localeCompare(b.id))) {
+      const evaluation = selectDeterministicStrategy(next, syndicate.id);
+      next = applySyndicateCommand(next, {
+        type: "choose_strategy",
+        commandId: `board-turn-${nextTurn}-strategy-${syndicate.id}`,
+        tick: next.tick,
+        syndicateId: syndicate.id,
+        strategy: evaluation.strategy,
+        reason: evaluation.reasons.join("; "),
+      });
+    }
+  }
+  return next;
+}
+
 export function simulateTurn(board: BoardState, action?: PlayerTurnAction): TurnResolution {
   const current = board.simulation;
   if (!current) return { board, summary: "Simulation state is not initialized.", events: [] };
 
+  const currentWithDynamics: SimulationState = {
+    ...current,
+    teamDynamics: ensureTeamDynamics(current),
+  };
   let seed = current.seed + current.turn + 1;
   const randomValues: number[] = [];
   for (let index = 0; index < Math.max(4, current.factions.length); index += 1) {
@@ -77,11 +105,12 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
   const evidenceChange = policeIntelligence / Math.max(1, factions.length * 80) + (randomValues[1]! > 0.8 ? 2 : 0);
   const mediaChange = current.cityTension > 55 ? 3 : randomValues[2]! > 0.85 ? 2 : -1;
   const publicChange = -Math.max(0, tensionChange) * 0.5 + (randomValues[3]! > 0.75 ? 1 : 0);
+  const nextTurn = current.turn + 1;
 
-  const next: SimulationState = {
-    ...current,
+  const nextBase: SimulationState = {
+    ...currentWithDynamics,
     seed,
-    turn: current.turn + 1,
+    turn: nextTurn,
     day: current.day + (current.hour >= 20 ? 1 : 0),
     hour: current.hour >= 20 ? 8 : current.hour + 4,
     factions,
@@ -91,15 +120,25 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
     evidenceQuality: clamp(current.evidenceQuality + evidenceChange),
     cityTension: clamp(current.cityTension + tensionChange),
     economyIndex: clamp(current.economyIndex + (randomValues[0]! - 0.5) * 2, 60, 140),
+    syndicateWorld: advanceSyndicateWorld(current.syndicateWorld, nextTurn),
+  };
+  const next: SimulationState = {
+    ...nextBase,
+    teamDynamics: applyPlayerTurnToTeamDynamics(currentWithDynamics, nextBase, action),
   };
 
-  const summary = `Turn ${next.turn}: city tension ${next.cityTension}, evidence ${next.evidenceQuality}, public confidence ${next.publicConfidence}, media pressure ${next.mediaPressure}.`;
+  const red = next.teamDynamics.red;
+  const blue = next.teamDynamics.blue;
+  const syndicateSummary = next.syndicateWorld
+    ? ` ${next.syndicateWorld.syndicates.length} syndicate(s), ${next.syndicateWorld.businesses.filter(item => item.enabled).length} active business(es), world tick ${next.syndicateWorld.tick}.`
+    : "";
+  const summary = `Turn ${next.turn}: Red ${red.estimatedSuccess.toFixed(1)}% / Blue ${blue.estimatedSuccess.toFixed(1)}% estimated success; morale ${red.collectiveMorale.toFixed(1)} / ${blue.collectiveMorale.toFixed(1)}; confidence ${red.confidence.toFixed(1)}%.${syndicateSummary}`;
   next.lastResolution = summary;
   const event: TimelineEvent = {
     id: nanoid(10),
     phaseId: board.currentPhaseId,
     label: `Turn ${next.turn} resolved`,
-    description: summary,
+    description: `${summary} City tension ${next.cityTension}, evidence ${next.evidenceQuality}, public confidence ${next.publicConfidence}.`,
     severity: next.cityTension >= 70 ? "critical" : next.cityTension >= 45 ? "caution" : "info",
     createdAt: new Date().toISOString(),
     sourceStatus: "balance",

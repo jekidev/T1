@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { z } from "zod";
 
 const router: IRouter = Router();
 
@@ -24,26 +25,26 @@ async function proxyAuth(path: string, init: RequestInit = {}) {
 }
 
 router.get("/telegram/auth/status", async (_req, res): Promise<void> => {
-  try {
-    const result = await proxyAuth("/status");
-    res.status(result.status).json(result.body);
-  } catch (error) {
-    res.status(503).json({ configured: Boolean(process.env.TELEGRAM_AUTH_API_URL), authenticated: false, message: error instanceof Error ? error.message : String(error) });
-  }
+  try { const result = await proxyAuth("/status"); res.status(result.status).json(result.body); }
+  catch (error) { res.status(503).json({ configured: Boolean(process.env.TELEGRAM_AUTH_API_URL), authenticated: false, message: error instanceof Error ? error.message : String(error) }); }
 });
 
 router.post("/telegram/auth/start", async (req, res): Promise<void> => {
-  try {
-    const result = await proxyAuth("/start", { method: "POST", body: JSON.stringify({ method: req.body?.method ?? "qr", phone: req.body?.phone }) });
-    res.status(result.status).json(result.body);
-  } catch (error) {
-    res.status(503).json({ message: error instanceof Error ? error.message : String(error) });
-  }
+  try { const result = await proxyAuth("/start", { method: "POST", body: JSON.stringify({ method: req.body?.method ?? "qr", phone: req.body?.phone }) }); res.status(result.status).json(result.body); }
+  catch (error) { res.status(503).json({ message: error instanceof Error ? error.message : String(error) }); }
 });
 
 router.post("/telegram/auth/verify", async (req, res): Promise<void> => {
+  try { const result = await proxyAuth("/verify", { method: "POST", body: JSON.stringify({ code: req.body?.code, password: req.body?.password, requestId: req.body?.requestId }) }); res.status(result.status).json(result.body); }
+  catch (error) { res.status(503).json({ message: error instanceof Error ? error.message : String(error) }); }
+});
+
+router.get("/telegram/people", async (req, res): Promise<void> => {
   try {
-    const result = await proxyAuth("/verify", { method: "POST", body: JSON.stringify({ code: req.body?.code, password: req.body?.password, requestId: req.body?.requestId }) });
+    const query = z.string().trim().max(200).default("").parse(req.query.query);
+    const limit = z.coerce.number().int().min(1).max(100).default(25).parse(req.query.limit);
+    const params = new URLSearchParams({ query, limit: String(limit) });
+    const result = await proxyAuth(`/people?${params.toString()}`);
     res.status(result.status).json(result.body);
   } catch (error) {
     res.status(503).json({ message: error instanceof Error ? error.message : String(error) });
@@ -51,12 +52,8 @@ router.post("/telegram/auth/verify", async (req, res): Promise<void> => {
 });
 
 router.post("/telegram/auth/logout", async (_req, res): Promise<void> => {
-  try {
-    const result = await proxyAuth("/logout", { method: "POST", body: "{}" });
-    res.status(result.status).json(result.body);
-  } catch (error) {
-    res.status(503).json({ message: error instanceof Error ? error.message : String(error) });
-  }
+  try { const result = await proxyAuth("/logout", { method: "POST", body: "{}" }); res.status(result.status).json(result.body); }
+  catch (error) { res.status(503).json({ message: error instanceof Error ? error.message : String(error) }); }
 });
 
 export default router;

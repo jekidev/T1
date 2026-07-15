@@ -1,0 +1,139 @@
+name: Strategy ECS Validate
+
+on:
+  push:
+    branches: [feature/strategy-ecs-phase-a]
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: strategy-ecs-phase-a
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout strategy branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/strategy-ecs-phase-a
+          fetch-depth: 0
+
+      - name: Validate and capture diagnostics
+        id: validate
+        shell: bash
+        run: |
+          set +e
+          mkdir -p docs/ci
+
+          {
+            echo "Node: $(node --version 2>&1)"
+            echo "npm: $(npm --version 2>&1)"
+            corepack enable
+            corepack prepare pnpm@10.13.1 --activate
+            echo "pnpm: $(pnpm --version 2>&1)"
+          } 2>&1 | tee /tmp/strategy-environment.log
+          ENV_CODE=${PIPESTATUS[0]}
+
+          INSTALL_CODE=99
+          TYPECHECK_CODE=99
+          TEST_CODE=99
+          BUILD_CODE=99
+
+          if [ "$ENV_CODE" -eq 0 ]; then
+            pnpm install --no-frozen-lockfile 2>&1 | tee /tmp/strategy-install.log
+            INSTALL_CODE=${PIPESTATUS[0]}
+          else
+            echo "Install skipped because environment setup failed." | tee /tmp/strategy-install.log
+          fi
+
+          if [ "$INSTALL_CODE" -eq 0 ]; then
+            pnpm typecheck 2>&1 | tee /tmp/strategy-typecheck.log
+            TYPECHECK_CODE=${PIPESTATUS[0]}
+
+            pnpm test:integration 2>&1 | tee /tmp/strategy-test.log
+            TEST_CODE=${PIPESTATUS[0]}
+
+            pnpm build 2>&1 | tee /tmp/strategy-build.log
+            BUILD_CODE=${PIPESTATUS[0]}
+          else
+            echo "Typecheck skipped because install failed." | tee /tmp/strategy-typecheck.log
+            echo "Tests skipped because install failed." | tee /tmp/strategy-test.log
+            echo "Build skipped because install failed." | tee /tmp/strategy-build.log
+          fi
+
+          {
+            echo "# Strategy ECS CI diagnostics"
+            echo
+            echo "Generated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo
+            echo "- Environment exit code: $ENV_CODE"
+            echo "- Install exit code: $INSTALL_CODE"
+            echo "- Typecheck exit code: $TYPECHECK_CODE"
+            echo "- Test exit code: $TEST_CODE"
+            echo "- Build exit code: $BUILD_CODE"
+            echo
+            for section in environment install typecheck test build; do
+              title=$(tr '[:lower:]' '[:upper:]' <<< "${section:0:1}")${section:1}
+              echo "## $title"
+              echo '```text'
+              tail -n 450 "/tmp/strategy-$section.log"
+              echo '```'
+              echo
+            done
+          } > docs/ci/strategy-latest.md
+
+          echo "environment_code=$ENV_CODE" >> "$GITHUB_OUTPUT"
+          echo "install_code=$INSTALL_CODE" >> "$GITHUB_OUTPUT"
+          echo "typecheck_code=$TYPECHECK_CODE" >> "$GITHUB_OUTPUT"
+          echo "test_code=$TEST_CODE" >> "$GITHUB_OUTPUT"
+          echo "build_code=$BUILD_CODE" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy-ecs-diagnostics
+          path: |
+            docs/ci/strategy-latest.md
+            pnpm-lock.yaml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Commit diagnostics and lockfile
+        continue-on-error: true
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ci/strategy-latest.md
+          if [ -f pnpm-lock.yaml ]; then
+            git add pnpm-lock.yaml
+          fi
+          if git diff --cached --quiet; then
+            echo "No diagnostic or lockfile changes to commit."
+            exit 0
+          fi
+          git commit -m "Record strategy ECS CI diagnostics"
+          git push origin HEAD:feature/strategy-ecs-phase-a
+
+      - name: Fail on validation error
+        shell: bash
+        run: |
+          if [ "${{ steps.validate.outputs.environment_code }}" -ne 0 ] || \
+             [ "${{ steps.validate.outputs.install_code }}" -ne 0 ] || \
+             [ "${{ steps.validate.outputs.typecheck_code }}" -ne 0 ] || \
+             [ "${{ steps.validate.outputs.test_code }}" -ne 0 ] || \
+             [ "${{ steps.validate.outputs.build_code }}" -ne 0 ]; then
+            echo "Strategy ECS validation failed. Read docs/ci/strategy-latest.md."
+            exit 1
+          fi

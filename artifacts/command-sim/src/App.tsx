@@ -1,22 +1,54 @@
-import { useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
-import ScenarioList from '@/pages/scenario-list';
-import BoardPage from '@/pages/board';
-import AnalyticsPage from '@/pages/analytics';
-import { installTelemetry } from '@/lib/telemetry';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { useEffect, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ObservabilityConsent } from "@/components/observability-consent";
+import { WorkspaceAssetSync } from "@/components/workspace-asset-sync";
+import { PreflightGate } from "@/components/workspace-preflight";
+import { BoardPresentationMigration } from "@/components/board-presentation-migration";
+import NotFound from "@/pages/not-found";
+import ScenarioListShell from "@/pages/scenario-list-shell";
+import BoardPage from "@/pages/board";
+import AnalyticsPage from "@/pages/analytics";
+import AssetLabPage from "@/pages/asset-lab";
+import ExternalAssetsPage from "@/pages/external-assets";
+import GeoLabPage from "@/pages/geo-lab";
+import CodingAgentPage from "@/pages/coding-agent";
+import WorkspacePage from "@/pages/workspace";
+import { installTelemetry } from "@/lib/telemetry";
+import { Route, Switch, Router as WouterRouter } from "wouter";
 
 const queryClient = new QueryClient();
+
+function GuardedTool({ children }: { children: ReactNode }) {
+  return <PreflightGate>{children}</PreflightGate>;
+}
+
+function GuardedBoard() {
+  return (
+    <GuardedTool>
+      <BoardPresentationMigration />
+      <BoardPage />
+    </GuardedTool>
+  );
+}
+function GuardedAnalytics() { return <GuardedTool><AnalyticsPage /></GuardedTool>; }
+function GuardedAssetLab() { return <GuardedTool><AssetLabPage /></GuardedTool>; }
+function GuardedExternalAssets() { return <GuardedTool><ExternalAssetsPage /></GuardedTool>; }
+function GuardedGeoLab() { return <GuardedTool><GeoLabPage /></GuardedTool>; }
+function GuardedCodingAgent() { return <GuardedTool><CodingAgentPage /></GuardedTool>; }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={ScenarioList} />
-      <Route path="/board/:id" component={BoardPage} />
-      <Route path="/analytics" component={AnalyticsPage} />
+      <Route path="/" component={ScenarioListShell} />
+      <Route path="/workspace" component={WorkspacePage} />
+      <Route path="/board/:id" component={GuardedBoard} />
+      <Route path="/analytics" component={GuardedAnalytics} />
+      <Route path="/asset-lab" component={GuardedAssetLab} />
+      <Route path="/external-assets" component={GuardedExternalAssets} />
+      <Route path="/geo-lab" component={GuardedGeoLab} />
+      <Route path="/coding-agent" component={GuardedCodingAgent} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -24,13 +56,12 @@ function Router() {
 
 function App() {
   useEffect(() => installTelemetry(), []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /></WouterRouter>
+        <WorkspaceAssetSync />
+        <ObservabilityConsent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
