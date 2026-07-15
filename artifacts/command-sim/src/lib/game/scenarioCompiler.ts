@@ -48,15 +48,18 @@ function toTemplateId(type: string): string {
 
 function compileEntities(payload: GeneratedGamePayload, world: BoardWorldState): BoardEntity[] {
   const factionByName = new Map(payload.factions.map(item => [item.name.toLowerCase(), item.faction]));
+  let bossAssigned = false;
   const factionEntities = payload.factions.map((item, index): BoardEntity => {
     const x = 120 + seededOffset(index, "x") * 760;
     const y = 120 + seededOffset(index, "y") * 760;
+    const isBoss = item.faction === "criminal" && !bossAssigned;
+    if (isBoss) bossAssigned = true;
     return {
       id: nanoid(10),
       templateId: item.faction === "police" ? "unit-police" : item.faction === "criminal" ? "unit-network" : "unit-civilian",
       category: "unit",
       faction: item.faction,
-      label: item.name,
+      label: isBoss ? `${item.name} Boss` : item.name,
       x,
       y,
       geo: boardToGeo(x, y, world),
@@ -70,10 +73,17 @@ function compileEntities(payload: GeneratedGamePayload, world: BoardWorldState):
       attributes: {
         ...DEFAULT_ATTRIBUTES,
         legalAuthority: item.faction === "police" ? 80 : 0,
-        influence: item.faction === "neutral" ? 65 : 55,
+        influence: item.faction === "neutral" ? 65 : isBoss ? 10 : 55,
+        resources: isBoss ? 0 : DEFAULT_ATTRIBUTES.resources,
         risk: item.faction === "criminal" ? 50 : 30,
       },
-      notes: `${item.role}\nGoal: ${item.goal}`,
+      notes: `${item.role}\nGoal: ${item.goal}${isBoss ? "\nStarting state: boss, alone, zero capital." : ""}`,
+      profile: {
+        personality: isBoss ? "Player-defined founding boss. Personality develops from chat, choices and uploaded profile assets." : "Generated faction representative.",
+        biography: isBoss ? `Founded alone in ${world.city} with no starting capital.` : item.role,
+        traits: isBoss ? ["founder", "boss", "player-controlled"] : ["generated", item.faction],
+        source: "generated",
+      },
       sourceStatus: "fictional",
     };
   });
@@ -109,20 +119,25 @@ function compileEntities(payload: GeneratedGamePayload, world: BoardWorldState):
 }
 
 function compileFactions(payload: GeneratedGamePayload): FactionState[] {
-  return payload.factions.map((item, index) => ({
-    id: `faction-${nanoid(8)}`,
-    name: item.name,
-    faction: item.faction,
-    treasury: item.faction === "police" ? 250000 : item.faction === "criminal" ? 100000 : 75000,
-    personnel: item.faction === "neutral" ? 12 : 20,
-    cohesion: 55 + (index % 4) * 8,
-    legitimacy: item.faction === "police" ? 70 : item.faction === "neutral" ? 65 : 35,
-    intelligence: 45 + (index % 5) * 7,
-    suspicion: item.faction === "criminal" ? 12 : 0,
-    territories: [],
-    relationships: {},
-    objectives: [item.goal],
-  }));
+  let playerFactionAssigned = false;
+  return payload.factions.map((item, index) => {
+    const isPlayerFaction = item.faction === "criminal" && !playerFactionAssigned;
+    if (isPlayerFaction) playerFactionAssigned = true;
+    return {
+      id: `faction-${nanoid(8)}`,
+      name: item.name,
+      faction: item.faction,
+      treasury: isPlayerFaction ? 0 : item.faction === "police" ? 250000 : item.faction === "criminal" ? 100000 : 75000,
+      personnel: isPlayerFaction ? 1 : item.faction === "neutral" ? 12 : 20,
+      cohesion: isPlayerFaction ? 100 : 55 + (index % 4) * 8,
+      legitimacy: item.faction === "police" ? 70 : item.faction === "neutral" ? 65 : isPlayerFaction ? 10 : 35,
+      intelligence: isPlayerFaction ? 5 : 45 + (index % 5) * 7,
+      suspicion: item.faction === "criminal" ? 12 : 0,
+      territories: [],
+      relationships: {},
+      objectives: [item.goal],
+    };
+  });
 }
 
 function compileShops(payload: GeneratedGamePayload, world: BoardWorldState): ShopState[] {
@@ -226,7 +241,14 @@ function compileSyndicateWorld(
     syndicateWorld = {
       ...syndicateWorld,
       syndicates: syndicateWorld.syndicates.map(syndicate =>
-        syndicate.id === syndicateId ? applyDanishSyndicatePreset(syndicate) : syndicate,
+        syndicate.id === syndicateId
+          ? {
+              ...applyDanishSyndicatePreset(syndicate),
+              resources: index === 0
+                ? { capital: 0, supplies: 0, workforce: 1, intelligence: 0, influence: 0 }
+                : syndicate.resources,
+            }
+          : syndicate,
       ),
     };
   }
@@ -273,6 +295,11 @@ export function compileGeneratedScenario(args: {
   };
   const seed = Math.abs([...premise].reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) | 0, 17));
   const factions = compileFactions(payload);
+  const entities = compileEntities(payload, world);
+  const boss = entities.find(entity => entity.category === "unit" && entity.faction === "criminal");
+  const alignment = playerAlignment
+    ? { ...playerAlignment, initialSpectrum: Math.max(1, Math.min(100, playerAlignment.initialSpectrum)) }
+    : { side: "observer" as const, initialSpectrum: 50 };
   const simulationBase: SimulationState = {
     seed,
     turn: 0,
@@ -288,20 +315,28 @@ export function compileGeneratedScenario(args: {
     shops: compileShops(payload, world),
     skills: compileSkills(payload),
     syndicateWorld: compileSyndicateWorld(board, payload, world, factions, seed),
-    lastResolution: "New Game compiled successfully.",
+    lastResolution: "New Game compiled successfully. Player starts as a solo boss with zero capital.",
   };
   const simulation: SimulationState = {
     ...simulationBase,
-    teamDynamics: createInitialTeamDynamics(simulationBase, playerAlignment ?? { side: "observer", initialSpectrum: 50 }),
+    teamDynamics: createInitialTeamDynamics(simulationBase, alignment),
   };
 
   return {
     ...board,
-    version: 5,
+    version: 6,
     world,
     generatedContent,
     simulation,
-    entities: compileEntities(payload, world),
+    entities,
+    playerWorkspace: {
+      role: "boss",
+      startedAlone: true,
+      startingCapital: 0,
+      ...(boss ? { bossEntityId: boss.id } : {}),
+      ownedAssetIds: board.playerWorkspace?.ownedAssetIds ?? [],
+      createdAt: board.playerWorkspace?.createdAt ?? new Date().toISOString(),
+    },
     notes: `${payload.storyline}\n\nOpening mission: ${payload.openingMission}`,
     phases: [
       { id: "phase-onboarding", name: "Guided Start", description: payload.tutorialSummary, order: 0 },
@@ -318,7 +353,7 @@ export function compileGeneratedScenario(args: {
         id: nanoid(10),
         phaseId: "phase-onboarding",
         label: "AI world compiled",
-        description: `${payload.openingMission} (${payload.factions.length} factions, ${payload.assets.length} assets, ${simulation.shops.length} shops, ${simulation.syndicateWorld?.syndicates.length ?? 0} syndicates). Player spectrum ${simulation.teamDynamics?.userProfile.initialSpectrum ?? 50}/100.`,
+        description: `${payload.openingMission} (${payload.factions.length} factions, ${payload.assets.length} assets, ${simulation.shops.length} shops, ${simulation.syndicateWorld?.syndicates.length ?? 0} syndicates). Player starts alone as boss with 0 capital. Spectrum ${simulation.teamDynamics?.userProfile.initialSpectrum ?? 50}/100.`,
         severity: "info",
         createdAt: new Date().toISOString(),
         sourceStatus: "fictional",
