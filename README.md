@@ -145,3 +145,23 @@ pnpm dev
 ```
 
 See `DEPLOYMENT.md` for the detailed flow.
+
+## GitHub starred repositories
+
+The Termux exporter in `integrations/starchive-termux` writes the authenticated
+account's starred repositories to CSV. It initializes GitHub's hosted MCP
+endpoint and uses `list_starred_repositories` when that tool is available.
+The current hosted endpoint may not expose the tool yet, so the exporter
+automatically falls back to GitHub's authenticated REST endpoint.
+
+From Termux:
+
+```bash
+cd integrations/starchive-termux
+./setup.sh
+./run.sh
+```
+
+The CSV is saved to Android's Downloads folder as
+`starred_repos.csv`. Set `GITHUB_USERNAME` to export another public account,
+or set `GITHUB_MCP_URL` to use another compatible MCP endpoint.

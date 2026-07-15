@@ -59,3 +59,12 @@ The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_
 - RSSHub is accessed through `RSSHUB_BASE_URL`.
 
 Browser code never receives provider tokens and cannot directly spawn arbitrary stdio processes.
+
+## Starred repository export
+
+`integrations/starchive-termux` is a standalone Termux exporter for the
+authenticated GitHub account's starred repositories. It probes the configured
+GitHub MCP server for `list_starred_repositories`; if the current hosted
+server does not expose that tool, it uses GitHub's authenticated REST
+fallback. Tokens remain in the environment or `gh auth`, and are never
+written to the repository.
