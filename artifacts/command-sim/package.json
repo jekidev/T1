@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
-    "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
+    "serve": "vite preview --config vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/lib/strategy/boardStrategyBridge.test.ts src/lib/game/teamPulse.test.ts"
+    "test": "tsx --test src/lib/strategy/boardStrategyBridge.test.ts src/lib/game/teamPulse.test.ts src/lib/game/sceneEnvironment.test.ts"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
