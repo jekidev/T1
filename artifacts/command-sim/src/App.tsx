@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,14 +20,23 @@ import { Route, Switch, Router as WouterRouter } from "wouter";
 
 const queryClient = new QueryClient();
 
+function GuardedTool({ children }: { children: ReactNode }) {
+  return <PreflightGate>{children}</PreflightGate>;
+}
+
 function GuardedBoard() {
   return (
-    <PreflightGate>
+    <GuardedTool>
       <BoardPresentationMigration />
       <BoardPage />
-    </PreflightGate>
+    </GuardedTool>
   );
 }
+function GuardedAnalytics() { return <GuardedTool><AnalyticsPage /></GuardedTool>; }
+function GuardedAssetLab() { return <GuardedTool><AssetLabPage /></GuardedTool>; }
+function GuardedExternalAssets() { return <GuardedTool><ExternalAssetsPage /></GuardedTool>; }
+function GuardedGeoLab() { return <GuardedTool><GeoLabPage /></GuardedTool>; }
+function GuardedCodingAgent() { return <GuardedTool><CodingAgentPage /></GuardedTool>; }
 
 function Router() {
   return (
@@ -35,11 +44,11 @@ function Router() {
       <Route path="/" component={ScenarioListShell} />
       <Route path="/workspace" component={WorkspacePage} />
       <Route path="/board/:id" component={GuardedBoard} />
-      <Route path="/analytics" component={AnalyticsPage} />
-      <Route path="/asset-lab" component={AssetLabPage} />
-      <Route path="/external-assets" component={ExternalAssetsPage} />
-      <Route path="/geo-lab" component={GeoLabPage} />
-      <Route path="/coding-agent" component={CodingAgentPage} />
+      <Route path="/analytics" component={GuardedAnalytics} />
+      <Route path="/asset-lab" component={GuardedAssetLab} />
+      <Route path="/external-assets" component={GuardedExternalAssets} />
+      <Route path="/geo-lab" component={GuardedGeoLab} />
+      <Route path="/coding-agent" component={GuardedCodingAgent} />
       <Route component={NotFound} />
     </Switch>
   );
