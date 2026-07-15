@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "assetRoot": "RAG/Graphics/pictures",
+  "assetRoot": "rag/Graphics/pictures",
   "renderPolicy": {
     "sourceHandling": "runtime-optimized-copy-from-user-upload",
     "originalUploadsModified": false,
