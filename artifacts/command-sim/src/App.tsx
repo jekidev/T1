@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ObservabilityConsent } from "@/components/observability-consent";
 import { PreflightGate } from "@/components/workspace-preflight";
 import NotFound from "@/pages/not-found";
-import ScenarioList from "@/pages/scenario-list";
+import ScenarioListShell from "@/pages/scenario-list-shell";
 import BoardPage from "@/pages/board";
 import AnalyticsPage from "@/pages/analytics";
 import AssetLabPage from "@/pages/asset-lab";
@@ -24,7 +24,7 @@ function GuardedBoard() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={ScenarioList} />
+      <Route path="/" component={ScenarioListShell} />
       <Route path="/workspace" component={WorkspacePage} />
       <Route path="/board/:id" component={GuardedBoard} />
       <Route path="/analytics" component={AnalyticsPage} />
@@ -38,13 +38,10 @@ function Router() {
 
 function App() {
   useEffect(() => installTelemetry(), []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /></WouterRouter>
         <ObservabilityConsent />
         <Toaster />
       </TooltipProvider>
