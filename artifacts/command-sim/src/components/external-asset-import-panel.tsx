@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Boxes, Check, Figma, Loader2, RefreshCw } from "lucide-react";
+import { Boxes, Check, Loader2, PenTool, RefreshCw } from "lucide-react";
 
 export interface ExternalAssetRecord {
   id: string;
@@ -101,7 +101,7 @@ export function ExternalAssetImportPanel({ onSelect }: { onSelect: (asset: Exter
       <CardHeader className="pb-3"><CardTitle className="flex items-center justify-between text-sm"><span className="flex items-center gap-2"><Boxes className="h-4 w-4" />User asset library</span><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => void refresh()}><RefreshCw className="h-3.5 w-3.5" /></Button></CardTitle></CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-1">
-          <Button size="sm" variant={provider === "figma" ? "default" : "outline"} onClick={() => setProvider("figma")}><Figma className="mr-1 h-3.5 w-3.5" />Figma</Button>
+          <Button size="sm" variant={provider === "figma" ? "default" : "outline"} onClick={() => setProvider("figma")}><PenTool className="mr-1 h-3.5 w-3.5" />Figma</Button>
           <Button size="sm" variant={provider === "huggingface" ? "default" : "outline"} onClick={() => setProvider("huggingface")}><Boxes className="mr-1 h-3.5 w-3.5" />Hugging Face</Button>
         </div>
 
