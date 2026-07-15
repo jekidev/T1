@@ -10,10 +10,12 @@ import { ScoringPanel } from "./scoring-panel";
 import { SimulationPanel } from "./simulation-panel";
 import { AdvisorPanel } from "./advisor-panel";
 import { DeveloperAiPanel } from "./developer-ai-panel";
+import { HeadsUpDock } from "./heads-up-dock";
 import { WorldMapUnderlay } from "./world-map-underlay";
 import { WorldSetupPanel } from "./world-setup-panel";
 import { GuidedTutorial } from "./guided-tutorial";
 import { saveWorldConfig } from "@/lib/world-config";
+import { trackTelemetry } from "@/lib/telemetry";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Clock, Loader2, Code2, MapPin, BarChart3, CircleHelp, Map as MapIcon, Layers3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +38,7 @@ export default function BoardPage() {
   const [worldSetupOpen, setWorldSetupOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [mapInteractive, setMapInteractive] = useState(false);
+  const [latestBehavior, setLatestBehavior] = useState<string | null>(null);
 
   useEffect(() => {
     const data = isTutorial ? tutorialQuery.data : scenarioQuery.data;
@@ -51,7 +54,14 @@ export default function BoardPage() {
   useEffect(() => { const interval = setInterval(() => setAutosaveTime(readAutosaveTimestamp()), 10000); return () => clearInterval(interval); }, []);
 
   const closeTutorial = () => { setTutorialOpen(false); localStorage.setItem("operation-kobenhavn-tutorial-complete", "1"); if (scenarioId) localStorage.removeItem(`tutorial-pending-${scenarioId}`); };
-  const resolveTurn = (action: PlayerTurnAction) => { const result = simulateTurn(board, action); loadBoard(result.board, scenarioId, scenarioName, scenarioDescription); toast({ title: `Turn ${result.board.simulation?.turn ?? ""} resolved`, description: result.summary }); };
+  const resolveTurn = (action: PlayerTurnAction) => {
+    const result = simulateTurn(board, action);
+    loadBoard(result.board, scenarioId, scenarioName, scenarioDescription);
+    const behavior = `Player resolved turn ${result.board.simulation?.turn ?? "unknown"}. Action: ${JSON.stringify(action)}. Result: ${result.summary}`;
+    setLatestBehavior(behavior);
+    trackTelemetry({ source: "game", level: "info", type: "player.turn.resolved", message: result.summary, data: { action, turn: result.board.simulation?.turn } });
+    toast({ title: `Turn ${result.board.simulation?.turn ?? ""} resolved`, description: result.summary });
+  };
   const handleSave = async () => { if (isTutorial || !scenarioId) { toast({ title: "Cannot save tutorial directly" }); return; } try { await updateMutation.mutateAsync({ id: scenarioId, data: { board: board as any } }); toast({ title: "Scenario saved" }); } catch { toast({ title: "Save failed", variant: "destructive" }); } };
   const handleExport = () => { const blob = new Blob([JSON.stringify(board, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `operation-${scenarioName.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
 
@@ -61,6 +71,7 @@ export default function BoardPage() {
   return <div className="flex flex-col h-screen w-full overflow-hidden bg-background select-text">
     <header className="h-12 border-b bg-card flex items-center justify-between px-4 shrink-0 z-30"><div className="flex items-center gap-4"><Button variant="ghost" size="icon" onClick={() => setLocation("/")}><ArrowLeft className="h-4 w-4" /></Button><div><h1 className="text-sm font-bold">{scenarioName}</h1><span className="text-[9px] text-muted-foreground">{board.world ? `${board.world.city}, ${board.world.country}` : "European world"} · Turn {board.simulation?.turn ?? 0}</span></div></div><div className="flex items-center gap-2">{autosaveTime && <span className="text-[10px] text-muted-foreground"><Clock className="inline h-3 w-3" /> {formatDistanceToNow(new Date(autosaveTime))} ago</span>}<Button variant={mapInteractive ? "default" : "outline"} size="sm" onClick={() => setMapInteractive(value => !value)}>{mapInteractive ? <Layers3 className="mr-1 h-3 w-3" /> : <MapIcon className="mr-1 h-3 w-3" />}{mapInteractive ? "Board" : "Map"}</Button><Button variant="outline" size="sm" onClick={() => setTutorialOpen(true)}><CircleHelp className="mr-1 h-3 w-3" />Guide</Button><Button variant="outline" size="sm" onClick={() => setWorldSetupOpen(true)}><MapPin className="mr-1 h-3 w-3" />World</Button><Button variant="outline" size="sm" onClick={() => setLocation("/analytics")}><BarChart3 className="mr-1 h-3 w-3" />Analytics</Button><Button variant={developerPanelOpen ? "default" : "outline"} size="sm" onClick={() => setDeveloperPanelOpen(value => !value)}><Code2 className="mr-1 h-3 w-3" />Developer AI</Button><Button variant="outline" size="sm" onClick={handleExport}><Download className="mr-1 h-3 w-3" />Export</Button>{!isTutorial && <Button size="sm" onClick={handleSave}><Save className="mr-1 h-3 w-3" />Save</Button>}</div></header>
     <div className="flex-1 overflow-hidden"><ResizablePanelGroup direction="horizontal"><ResizablePanel defaultSize={15} minSize={10}><PaletteSidebar /></ResizablePanel><ResizableHandle withHandle /><ResizablePanel defaultSize={58}><ResizablePanelGroup direction="vertical"><ResizablePanel defaultSize={64}><div className="relative h-full"><WorldMapUnderlay interactive={mapInteractive} /><div className={`absolute inset-0 z-10 ${mapInteractive ? "pointer-events-none opacity-25" : ""}`}><CommandCanvas mapTemplateId={board.mapTemplateId} /></div></div></ResizablePanel><ResizableHandle withHandle /><ResizablePanel defaultSize={36} minSize={20}><ResizablePanelGroup direction="horizontal"><ResizablePanel defaultSize={50}><SimulationPanel board={board} onResolve={resolveTurn} /></ResizablePanel><ResizableHandle withHandle /><ResizablePanel defaultSize={50}><ScoringPanel /></ResizablePanel></ResizablePanelGroup></ResizablePanel></ResizablePanelGroup></ResizablePanel><ResizableHandle withHandle /><ResizablePanel defaultSize={27} minSize={18}><ResizablePanelGroup direction="vertical"><ResizablePanel defaultSize={45}><PropertiesSidebar /></ResizablePanel><ResizableHandle withHandle /><ResizablePanel defaultSize={55}><AdvisorPanel /></ResizablePanel></ResizablePanelGroup></ResizablePanel></ResizablePanelGroup></div>
+    <HeadsUpDock board={board as unknown as Record<string, unknown>} behavior={latestBehavior} />
     <DeveloperAiPanel open={developerPanelOpen} onClose={() => setDeveloperPanelOpen(false)} /><WorldSetupPanel open={worldSetupOpen} onClose={() => setWorldSetupOpen(false)} /><GuidedTutorial open={tutorialOpen} onClose={closeTutorial} scenarioName={scenarioName} city={board.world?.city} generatedSummary={board.generatedContent?.tutorialSummary} />
   </div>;
 }

@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { syncRagIntoPersistentMemory } from "./lib/rag-memory";
+import { startHeadsUpScheduler } from "./lib/llm-heads-up";
 
 const rawPort = process.env["PORT"];
 
@@ -16,8 +17,11 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-void syncRagIntoPersistentMemory().catch((error) => {
+void syncRagIntoPersistentMemory().then(() => {
+  startHeadsUpScheduler();
+}).catch((error) => {
   logger.error({ error }, "RAG startup sync failed");
+  startHeadsUpScheduler();
 });
 
 app.listen(port, (err) => {
