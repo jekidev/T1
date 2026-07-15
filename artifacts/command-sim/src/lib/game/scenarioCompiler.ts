@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import {
+  applyDanishSyndicatePreset,
   applySyndicateCommand,
   createSyndicateWorld,
   type SyndicateWorldState,
@@ -213,14 +214,21 @@ function compileSyndicateWorld(
   let syndicateWorld = createSyndicateWorld(seed, compileTerritories(board, world));
   const criminalFactions = factions.filter(faction => faction.faction === "criminal");
   for (const [index, faction] of criminalFactions.entries()) {
+    const syndicateId = `syndicate-${slug(faction.id)}`;
     syndicateWorld = applySyndicateCommand(syndicateWorld, {
       type: "create_syndicate",
       commandId: `compile-syndicate-${index}-${faction.id}`,
       tick: 0,
-      syndicateId: `syndicate-${slug(faction.id)}`,
+      syndicateId,
       name: faction.name,
       leaderNpcId: `npc-leader-${slug(faction.name)}`,
     });
+    syndicateWorld = {
+      ...syndicateWorld,
+      syndicates: syndicateWorld.syndicates.map(syndicate =>
+        syndicate.id === syndicateId ? applyDanishSyndicatePreset(syndicate) : syndicate,
+      ),
+    };
   }
   syndicateWorld.sourceCases = payload.sourceCases.map((title, index) => ({
     id: `source-case-${index}-${slug(title)}`,
@@ -231,6 +239,16 @@ function compileSyndicateWorld(
     patternTags: ["real-case-inspired", "fictionalized-characters"],
     fictionalizationRule: "Use only source-backed structural patterns. Replace all private people, personal data and operational details with fictional game entities.",
   }));
+  const sourceCaseIds = syndicateWorld.sourceCases.map(sourceCase => sourceCase.id);
+  if (sourceCaseIds.length > 0) {
+    syndicateWorld = {
+      ...syndicateWorld,
+      syndicates: syndicateWorld.syndicates.map((syndicate, index) => ({
+        ...syndicate,
+        sourceCaseIds: [sourceCaseIds[index % sourceCaseIds.length]!],
+      })),
+    };
+  }
   return syndicateWorld;
 }
 
