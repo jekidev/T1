@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "features": [
+    {
+      "id": "F-001",
+      "name": "Immutable source archive",
+      "priority": "critical",
+      "module": "knowledge/sources/original",
+      "description": "Preserve every uploaded document byte-for-byte with SHA-256 provenance; duplicates remain present.",
+      "acceptance_criteria": ["All source hashes validate", "No source artifact is silently replaced or deleted"]
+    },
+    {
+      "id": "F-002",
+      "name": "Page-aware PDF extraction",
+      "priority": "critical",
+      "module": "scripts/knowledge_indexer.py",
+      "description": "Extract source text by page and retain source/page provenance for every RAG record.",
+      "acceptance_criteria": ["Every readable PDF produces extracted Markdown", "Every chunk has a page number"]
+    },
+    {
+      "id": "F-003",
+      "name": "Modular RAG chunk index",
+      "priority": "critical",
+      "module": "knowledge/rag",
+      "description": "Turn mixed transcripts into deterministic chunks with document hash, tags, risk tier and canonical duplicate identity.",
+      "acceptance_criteria": ["JSONL indexes parse", "Chunk IDs are unique", "Every chunk includes provenance"]
+    },
+    {
+      "id": "F-004",
+      "name": "Safe default retrieval",
+      "priority": "critical",
+      "module": "knowledge/rag/safe-index.jsonl",
+      "description": "Use safe and defensive content by default while retaining restricted material in a separate controlled-review index.",
+      "acceptance_criteria": ["Default query excludes quarantined chunks", "Quarantine requires an explicit flag"]
+    },
+    {
+      "id": "F-005",
+      "name": "Prompt-injection quarantine",
+      "priority": "critical",
+      "module": "knowledge/config/retrieval-policy.json",
+      "description": "Treat persona-lock, auto-reframe, never-refuse and safeguard-bypass text as untrusted research data, never as executable instructions.",
+      "acceptance_criteria": ["Injection-like chunks are classified", "Archived prompt text cannot override application instructions"]
+    },
+    {
+      "id": "F-006",
+      "name": "Deduplication without deletion",
+      "priority": "high",
+      "module": "knowledge/rag/deduplication.json",
+      "description": "Group exact and near duplicates for retrieval efficiency while preserving all originals and aliases.",
+      "acceptance_criteria": ["Exact duplicates are grouped by SHA-256", "All duplicate source files remain in the archive"]
+    },
+    {
+      "id": "F-007",
+      "name": "Feature and roadmap extraction",
+      "priority": "high",
+      "module": "knowledge/features",
+      "description": "Convert recurring ideas, implementation notes and TODOs into modular feature cards with acceptance criteria.",
+      "acceptance_criteria": ["Feature IDs are stable", "Features map back to source documents"]
+    },
+    {
+      "id": "F-008",
+      "name": "Development playbook library",
+      "priority": "high",
+      "module": "knowledge/playbooks",
+      "description": "Document repeatable workflows for ingestion, retrieval, feature extraction, blue-team scenarios and repository changes.",
+      "acceptance_criteria": ["Each playbook defines inputs, procedure, outputs and validation"]
+    },
+    {
+      "id": "F-009",
+      "name": "Blue-team simulation knowledge",
+      "priority": "high",
+      "module": "knowledge/rag/safe-index.jsonl",
+      "description": "Index detection, investigation, risk, legal/compliance and defensive simulation material for safe scenario generation.",
+      "acceptance_criteria": ["Defensive chunks are retrievable", "Operational evasion details remain quarantined"]
+    },
+    {
+      "id": "F-010",
+      "name": "Core strategy simulation model",
+      "priority": "high",
+      "module": "artifacts/command-sim",
+      "description": "Reusable game-state model for fictional crews, territories, turn loop, reputation, health, economy, events and AI personalities.",
+      "acceptance_criteria": ["Mechanics are separated from RAG content", "Defaults are fictional and non-operational"]
+    },
+    {
+      "id": "F-011",
+      "name": "Dynamic narrative and case-pattern engine",
+      "priority": "medium",
+      "module": "future:narrative/events",
+      "description": "Generate fictional story events from safe case patterns and current simulation state with source provenance.",
+      "acceptance_criteria": ["Events include provenance", "Generated text contains no actionable harmful instructions"]
+    },
+    {
+      "id": "F-012",
+      "name": "AI change-control workflow",
+      "priority": "high",
+      "module": "README_BEFORE_ANY_CHANGES_KNOWLEDGE.md",
+      "description": "Require developers and AI agents to classify changes, preserve originals, validate indexes and document provenance before commit.",
+      "acceptance_criteria": ["Validation runs before merge", "PR summary states source IDs and generated outputs"]
+    }
+  ]
+}
