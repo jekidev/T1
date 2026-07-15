@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import ScenarioList from "./scenario-list";
 import { Button } from "@/components/ui/button";
-import { PanelsTopLeft } from "lucide-react";
+import { Boxes, PanelsTopLeft } from "lucide-react";
 
 export default function ScenarioListShell() {
   const [, setLocation] = useLocation();
@@ -27,7 +27,10 @@ export default function ScenarioListShell() {
 
   return (
     <div className="relative min-h-screen bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.1),transparent_35%)]">
-      <div className="fixed right-4 top-4 z-40"><Button variant="outline" className="bg-card/90 shadow-xl backdrop-blur" onClick={() => setLocation("/workspace")}><PanelsTopLeft className="mr-2 h-4 w-4" />Workspace & Preflight</Button></div>
+      <div className="fixed right-4 top-4 z-40 flex flex-wrap justify-end gap-2">
+        <Button variant="outline" className="bg-card/90 shadow-xl backdrop-blur" onClick={() => setLocation("/external-assets")}><Boxes className="mr-2 h-4 w-4" />Figma / HF Assets</Button>
+        <Button variant="outline" className="bg-card/90 shadow-xl backdrop-blur" onClick={() => setLocation("/workspace")}><PanelsTopLeft className="mr-2 h-4 w-4" />Workspace & Preflight</Button>
+      </div>
       <ScenarioList />
     </div>
   );

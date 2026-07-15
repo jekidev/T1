@@ -10,6 +10,7 @@ import ScenarioListShell from "@/pages/scenario-list-shell";
 import BoardPage from "@/pages/board";
 import AnalyticsPage from "@/pages/analytics";
 import AssetLabPage from "@/pages/asset-lab";
+import ExternalAssetsPage from "@/pages/external-assets";
 import GeoLabPage from "@/pages/geo-lab";
 import CodingAgentPage from "@/pages/coding-agent";
 import WorkspacePage from "@/pages/workspace";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/board/:id" component={GuardedBoard} />
       <Route path="/analytics" component={AnalyticsPage} />
       <Route path="/asset-lab" component={AssetLabPage} />
+      <Route path="/external-assets" component={ExternalAssetsPage} />
       <Route path="/geo-lab" component={GeoLabPage} />
       <Route path="/coding-agent" component={CodingAgentPage} />
       <Route component={NotFound} />
