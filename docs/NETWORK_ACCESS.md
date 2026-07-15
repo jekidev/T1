@@ -24,6 +24,17 @@ API server
 
 Prompt text alone is not considered network enforcement.
 
+## Two independent credentials
+
+Network sessions and network decisions use separate credentials:
+
+1. `X-Network-Session-Token` identifies one temporary session.
+2. `X-Network-Permission-Token` proves that a human/operator is allowed to approve a pending request or enable Ultra.
+
+The second credential must match the server-side `NETWORK_PERMISSION_ADMIN_TOKEN`, which must contain at least 24 characters. When it is missing or too short, approval and Ultra endpoints fail closed. A session token alone can create a pending request, but it cannot approve that request and cannot enable Ultra.
+
+The browser requests the administrator token only when the user approves a request or enables Ultra. It is retained in module memory only. It is not written to local storage, request bodies, chat history, RAG, replay data or game state. Production use requires HTTPS.
+
 ## Ask First
 
 ### RAG and book imports
@@ -36,13 +47,13 @@ Each external request exposes:
 - reason
 - expiry
 
-The user approves or denies that matching target. An approval remains valid only for the same exact capability, origin, path and query during the temporary session. A different file, query or redirect destination creates a separate authorization decision and is DNS-validated again.
+The user approves or denies that matching target. Approval requires the separate network-permission administrator credential. An approval remains valid only for the same exact capability, origin, path and query during the temporary session. A different file, query or redirect destination creates a separate authorization decision and is DNS-validated again.
 
 This session-scoped behavior avoids redirect approval loops without granting origin-wide access.
 
 ### Coding-agent runs
 
-Approval is bound to the run before execution:
+Coding-agent administration is separately protected by `CODING_AGENT_ADMIN_TOKEN`. Network authorization is bound to the run before execution:
 
 ```ts
 interface AgentNetworkPolicy {
@@ -54,7 +65,7 @@ interface AgentNetworkPolicy {
 }
 ```
 
-No host/capability pair means deny-all. Adding a host or capability requires a new run and explicit approval. Wildcards are forbidden.
+No host/capability pair means deny-all. Adding a host or capability requires a new run and explicit administrator authorization. Wildcards are forbidden.
 
 Available capabilities:
 
@@ -68,15 +79,19 @@ issue_tracker
 
 ## Ultra
 
-Ultra is never the default. Application network sessions require the exact interactive confirmation phrase:
+Ultra is never the default. Application network sessions require both:
+
+1. the exact interactive confirmation phrase:
 
 ```text
 ENABLE ULTRA
 ```
 
-The server also requires and records `approvedBy` and `approvedAt`. Possession of an LLM prompt, AI profile or agent tool is not sufficient to enable Ultra. The browser installs one global permission guard, so all current and future UI components pass through the same explicit confirmation boundary.
+2. a valid `NETWORK_PERMISSION_ADMIN_TOKEN` sent only in `X-Network-Permission-Token`.
 
-Coding-agent Ultra runs separately require `approvedBy` and `approvedAt` in the immutable run request.
+The server derives and records the approving actor and timestamp. Client-supplied `approvedBy` values are not trusted. Possession of an LLM prompt, AI profile, session token or agent tool is not sufficient to enable Ultra. The browser installs one global permission guard, so current and future UI components pass through the same confirmation and administrator-credential boundary.
+
+Coding-agent Ultra runs separately require authenticated coding-agent administration plus `approvedBy` and `approvedAt` in the immutable run request.
 
 Ultra permits public HTTPS retrieval without prompting for each origin during that temporary session or isolated run. It does **not** permit:
 
@@ -172,5 +187,14 @@ The Developer AI panel contains Ask First/Ultra, explicit Ultra confirmation, bo
 The coding-agent inspector contains approved hosts, capability controls and a firewall-audit view. Network-session and administrator tokens remain in component memory and are blocked from session replay.
 
 ## Deployment requirement
+
+Set at minimum:
+
+```dotenv
+NETWORK_PERMISSION_ADMIN_TOKEN=<random secret with at least 24 characters>
+CODING_AGENT_ADMIN_TOKEN=<separate random secret with at least 24 characters>
+```
+
+Use different values. Do not expose either value through `VITE_*`, frontend bundles, chat prompts, RAG, logs or game saves.
 
 The strongest “cannot bypass” property depends on the worker network topology. The worker must have no direct public route outside the controlled firewall/egress proxy. The application contract and audit reject policy violations, but they do not replace infrastructure isolation.
