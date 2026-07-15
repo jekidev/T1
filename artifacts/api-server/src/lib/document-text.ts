@@ -52,6 +52,7 @@ export async function extractDocumentText(file: string, maxCharacters = 120_000)
     try {
       const { stdout } = await execFileAsync(command, [helper, file, "--max-chars", String(maxCharacters)], {
         cwd: projectRoot,
+        encoding: "utf8",
         timeout: 45_000,
         maxBuffer: Math.max(1_000_000, maxCharacters * 2),
       });
