@@ -58,20 +58,27 @@ function normalizedPrefix(value: string): string {
   return value.replaceAll("\\", "/").replace(/^\/+|\/+$/g, "").toLowerCase();
 }
 
-export async function syncRagIntoPersistentMemory(): Promise<{ added: number; total: number; skipped: number }> {
+export async function syncRagIntoPersistentMemory(): Promise<{ added: number; total: number; skipped: number; reprocessed: number }> {
   await fs.mkdir(ragRoot, { recursive: true });
   const existing = await loadMemory();
-  const hashes = new Set(existing.map((item) => item.sha256));
+  const existingByHash = new Map(existing.map((item) => [item.sha256, item]));
   const files = await walk(ragRoot);
   let added = 0;
   let skipped = 0;
+  let reprocessed = 0;
 
   for (const file of files) {
     const stat = await fs.stat(file);
     if (stat.size > 8_000_000) { skipped += 1; continue; }
     const bytes = await fs.readFile(file);
     const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-    if (hashes.has(sha256)) { skipped += 1; continue; }
+    const previous = existingByHash.get(sha256);
+    if (previous && previous.extraction !== "unavailable") { skipped += 1; continue; }
+    const wasReprocessed = Boolean(previous);
+    if (previous) {
+      const previousIndex = existing.indexOf(previous);
+      if (previousIndex >= 0) existing.splice(previousIndex, 1);
+    }
 
     const extension = path.extname(file).toLowerCase();
     const relative = path.relative(root, file).replaceAll(path.sep, "/");
@@ -96,7 +103,7 @@ export async function syncRagIntoPersistentMemory(): Promise<{ added: number; to
       warning = extracted.warning;
     }
 
-    existing.push({
+    const item: RagMemoryItem = {
       id: crypto.randomUUID(),
       sourcePath: relative,
       sha256,
@@ -107,14 +114,16 @@ export async function syncRagIntoPersistentMemory(): Promise<{ added: number; to
       sizeBytes: stat.size,
       extraction,
       warning,
-    });
-    hashes.add(sha256);
-    added += 1;
+    };
+    existing.push(item);
+    existingByHash.set(sha256, item);
+    if (wasReprocessed) reprocessed += 1;
+    else added += 1;
   }
 
   await saveMemory(existing.slice(-5000));
-  recordObservabilityEvent({ source: "system", level: "info", type: "rag.startup-sync", message: `RAG startup sync added ${added} items`, data: { added, skipped, total: existing.length } });
-  return { added, skipped, total: existing.length };
+  recordObservabilityEvent({ source: "system", level: "info", type: "rag.startup-sync", message: `RAG startup sync added ${added} items`, data: { added, skipped, reprocessed, total: existing.length } });
+  return { added, skipped, reprocessed, total: existing.length };
 }
 
 export async function listRagMemory(): Promise<RagMemoryItem[]> {

@@ -60,6 +60,11 @@ Use https://github.com/jekidev/T1 as the canonical repository. Run pnpm setup fi
 
 The repository supports Google Drive as the only external RAG source.
 
+All versioned documents under `rag/` are also scanned automatically by the
+server startup sync, including cases, storyline, world, mechanics, imports,
+wisdom, and PDF documents. If a document previously failed extraction,
+subsequent syncs retry it after the required extractor is installed.
+
 When a platform connection is available, Replit or Manus should use that authenticated connection to read Drive files and pass them into the project ingestion flow.
 
 For local or Termux use, place downloaded Drive files in:

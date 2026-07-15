@@ -31,6 +31,7 @@ node_modules
 /.sass-cache
 /connect.lock
 /coverage
+/.runtime/
 /integrations/starchive-termux/output/
 /libpeerconnection.log
 npm-debug.log

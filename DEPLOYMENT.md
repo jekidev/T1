@@ -52,6 +52,10 @@ Use https://github.com/jekidev/T1 as the canonical repository. Run pnpm setup fi
 
 Google Drive is the only external RAG source.
 
+Repository-owned RAG files under `rag/` are indexed by the server's persistent
+memory sync as well. Start the API or call `POST /api/rag/sync` after adding
+documents; PDF extraction requires `requirements-knowledge.txt`.
+
 Platform mode:
 
 - Replit or Manus authenticates Google Drive through its own connection UI.
