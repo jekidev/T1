@@ -93,6 +93,15 @@ TELEGRAM_SESSION_STRING_PERSONAL=...
 
 Then run the Telegram MCP server. Each account becomes selectable through the `account` parameter on multi-account tools.
 
+## Chat commands
+
+The advisor chat supports two Telegram setup commands. Send them as the user message in the AI Workspace chat:
+
+- `/telegram-api` — runs the API id/hash fetcher using `TELEGRAM_FETCH_PHONE` and `TELEGRAM_FETCH_CODE` from the server environment and returns the values.
+- `/telegram-sessions` — returns the step-by-step guide for generating labelled session strings for multiple accounts.
+
+Import the `Telegram Setup Assistant` profile from `ai-workspace/templates/telegram-setup-assistant.json` for a reusable prompt that guides users through both commands.
+
 ## Telegram modify mode
 
 `TELEGRAM_EXPOSED_TOOLS=all` exposes read and modifying Telegram tools. T1 marks Telegram writes as approval-required. The AI must show the intended recipients, action and payload before a modifying call is authorized.

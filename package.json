@@ -7,6 +7,7 @@
     "setup": "node scripts/setup.mjs",
     "setup:mcp": "node scripts/setup-mcp-vendors.mjs",
     "mcp:fetch-telegram-api": "node scripts/fetch-telegram-api.mjs",
+    "mcp:test:telegram-api": "node scripts/run-python-tests.mjs",
     "deployment:start": "node deployment/bootstrap.mjs",
     "deployment:replit": "node deployment/replit.mjs",
     "deployment:manus": "node deployment/manus.mjs",
