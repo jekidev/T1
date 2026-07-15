@@ -16,6 +16,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Embedded basic-auth credentials in the URL break in-page fetch() for relative
+      // API calls. Strip them and rely on the browser's cached auth for the same host.
+      const url = new URL(window.location.href);
+      if (url.username || url.password) {
+        url.username = '';
+        url.password = '';
+        window.location.replace(url.toString());
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
