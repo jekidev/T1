@@ -1,4 +1,4 @@
-import { loadWorkspaceState } from "./workspace";
+import { buildLlmWorkspaceContext, loadWorkspaceState } from "./workspace";
 
 export type LlmRoutingMode = "rotate" | "static" | "off";
 export interface AiMemory { id: string; title: string; content: string; enabled: boolean; }
@@ -68,18 +68,13 @@ export function buildAiProfileContext(profile: AiWorkspaceProfile): string {
   const enabledMemories = profile.memories.filter(memory => memory.enabled);
   const enabledMcp = profile.mcpServers.filter(server => server.enabled);
   const workspace = loadWorkspaceState();
-  const modeInstruction = workspace.chatMode === "talk"
-    ? "TALK MODE: Collaborate conversationally. Explain, ask focused questions and do not emit a state-changing build proposal unless the user switches mode."
-    : workspace.chatMode === "plan"
-      ? "PLAN MODE: Produce a structured implementation/story plan with dependencies, acceptance criteria, risks and validation. Do not claim it has been applied."
-      : "BUILD MODE: Produce an additive proposal only. Finish with one valid JSON object using this schema: {\"notesAppend\":string,\"phases\":[{\"name\":string,\"description\":string}],\"timelineEvents\":[{\"label\":string,\"description\":string,\"severity\":\"info\"|\"caution\"|\"critical\"}],\"entities\":[{\"label\":string,\"category\":\"unit\"|\"location\"|\"resource\"|\"objective\"|\"evidence\"|\"vehicle\"|\"civilian\"|\"event\",\"faction\":\"police\"|\"criminal\"|\"neutral\",\"notes\":string}]}. The JSON is a proposal and is not applied until the user explicitly clicks Apply last build.";
   return [
+    buildLlmWorkspaceContext(workspace),
     `AI Workspace profile: ${profile.name}`,
-    `Workspace collaboration mode: ${workspace.chatMode.toUpperCase()}`,
-    modeInstruction,
     `Saved workflows: ${workspace.workflows.map(item => `${item.name} (${item.steps.length} steps)`).join(", ")}`,
     `Integrated repositories: ${workspace.repositories.map(item => item.fullName).join(", ") || "none"}`,
     `Available user assets: ${workspace.assets.map(item => `${item.name} [${item.origin}]`).join(", ") || "none"}`,
+    `Enabled plugins: ${workspace.plugins.filter(plugin => plugin.enabled).map(plugin => plugin.name).join(", ") || "none"}`,
     `Description: ${profile.description}`,
     `Routing mode: ${profile.routing.mode}`,
     `Static model: ${profile.routing.staticModel}`,
