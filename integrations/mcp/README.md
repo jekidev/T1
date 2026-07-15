@@ -43,6 +43,7 @@ This clones:
 
 - `chigwell/telegram-mcp` into `integrations/vendor/telegram-mcp`
 - `megahomyak/tg_auth_api` into `integrations/vendor/tg_auth_api`
+- `SaseQ/discord-mcp` into `integrations/vendor/discord-mcp`
 
 The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_URL`. Its exact startup command and endpoint names may differ by revision; configure or adapt the proxy before production use. Secrets and Telegram session strings must remain in the hosting platform secret store.
 
@@ -50,12 +51,28 @@ The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_
 
 `TELEGRAM_EXPOSED_TOOLS=all` exposes read and modifying Telegram tools. T1 marks Telegram writes as approval-required. The AI must show the intended recipients, action and payload before a modifying call is authorized.
 
+## Discord MCP
+
+`discord-mcp` is vendored into `integrations/vendor/discord-mcp` by `pnpm setup:mcp`. It runs as an external HTTP MCP server, typically started with Docker on port `8085`:
+
+```bash
+cd integrations/vendor/discord-mcp
+# Create .env from .env.example and set DISCORD_TOKEN
+SPRING_PROFILES_ACTIVE=http \
+DISCORD_TOKEN="YOUR_DISCORD_BOT_TOKEN" \
+DISCORD_GUILD_ID="OPTIONAL_DEFAULT_SERVER_ID" \
+  docker compose up -d --build
+```
+
+The registry entry uses `http://localhost:8085/mcp` and marks all modifying tools as approval-required. The `DISCORD_GUILD_ID` environment variable is optional; when set, tools that accept a `guildId` can omit it.
+
 ## External MCP services
 
 - GitHub MCP uses GitHub's remote MCP endpoint.
 - Hugging Face Hub MCP uses the Hub MCP endpoint.
 - Google Maps uses a server-side adapter and `GOOGLE_MAPS_API_KEY`.
 - Playwright MCP runs through `npx @playwright/mcp@latest` in an approved development runtime.
+- Discord MCP runs as an external HTTP server at `http://localhost:8085/mcp` and requires `DISCORD_TOKEN`.
 - RSSHub is accessed through `RSSHUB_BASE_URL`.
 
 Browser code never receives provider tokens and cannot directly spawn arbitrary stdio processes.
