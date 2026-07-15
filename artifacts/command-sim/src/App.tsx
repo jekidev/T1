@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ObservabilityConsent } from "@/components/observability-consent";
+import { WorkspaceAssetSync } from "@/components/workspace-asset-sync";
 import { PreflightGate } from "@/components/workspace-preflight";
 import { BoardPresentationMigration } from "@/components/board-presentation-migration";
 import NotFound from "@/pages/not-found";
@@ -50,6 +51,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}><Router /></WouterRouter>
+        <WorkspaceAssetSync />
         <ObservabilityConsent />
         <Toaster />
       </TooltipProvider>
