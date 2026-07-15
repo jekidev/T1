@@ -33,6 +33,8 @@ export interface WorkspacePlugin {
   description: string;
   enabled: boolean;
   category: "core" | "mcp" | "integration" | "visual";
+  sourceRepository?: string;
+  installedAt?: string;
 }
 
 export interface WorkspaceHyperlink {
@@ -96,6 +98,19 @@ export function defaultWorkspaceState(): UserWorkspaceState {
         ],
       },
       {
+        id: "workflow-build-board-from-scratch",
+        name: "Build Board From Scratch",
+        description: "Start with the solo boss on the real map, then design layers, districts, people, assets and missions in controlled stages.",
+        createdAt: now,
+        updatedAt: now,
+        steps: [
+          step("talk", "Board discovery", "Clarify the selected city, geographic radius, visual atmosphere, starting district, intended player fantasy, initial moral stance and the first playable decision. The player remains a solo boss with zero capital."),
+          step("plan", "Board architecture", "Produce an ordered board plan covering map anchors, layers, zones, factions, NPC roles, initial assets, shops, mission phases, fog of war, dependencies and acceptance criteria. Preserve the Google Maps base layer."),
+          step("build", "Build first playable board", "Return an additive build proposal for the minimum playable board: boss profile, initial phase, map-anchored entities, one objective, one resource loop and one event. Do not delete existing entities or change starting capital."),
+          step("talk", "Playtest review", "Review the resulting board with the user. Identify confusing layout, missing feedback, balance issues and the next small build slice."),
+        ],
+      },
+      {
         id: "workflow-build-player",
         name: "Build Player",
         description: "Talk → plan → build the boss identity, personality, biography and starting visual profile.",
@@ -104,7 +119,7 @@ export function defaultWorkspaceState(): UserWorkspaceState {
         steps: [
           step("talk", "Player discovery", "Ask focused questions about the boss name, identity, personality, biography, visual style, strengths, weaknesses and intended moral direction."),
           step("plan", "Player profile plan", "Produce a compact player-profile plan and identify missing information. Do not modify the board."),
-          step("build", "Build player profile", "Return an additive build proposal containing playerProfile with name, biography, personality, traits and optional avatarUrl. Preserve boss role, zero starting capital and solo start."),
+          step("build", "Build player profile", "Return an additive build proposal containing playerProfile with name, biography, personality, traits and optional avatarUrl or avatarAssetId. Preserve boss role, zero starting capital and solo start."),
         ],
       },
       {
@@ -121,9 +136,11 @@ export function defaultWorkspaceState(): UserWorkspaceState {
       },
     ],
     plugins: [
+      { id: "plugin-storyline", name: "Storyline Builder", description: "Talk, plan and build versioned phases, missions, entities and events.", enabled: true, category: "core" },
+      { id: "plugin-family-tree", name: "Family Tree", description: "Ranked syndicate hierarchy, employee profiles, assets and explicit Telegram imports.", enabled: true, category: "visual" },
       { id: "plugin-github", name: "GitHub Workspace", description: "Owned/starred repositories, creation and integration workflows.", enabled: true, category: "integration" },
-      { id: "plugin-assets", name: "Universal Assets", description: "Images, video and generated media for every user.", enabled: true, category: "core" },
-      { id: "plugin-telegram", name: "Telegram MCP Units", description: "Import explicitly selected Telegram people as fictional board units.", enabled: false, category: "mcp" },
+      { id: "plugin-assets", name: "Universal Assets", description: "Images, video and generated media for every authenticated user.", enabled: true, category: "core" },
+      { id: "plugin-telegram", name: "Telegram MCP Units", description: "Authenticate a user-owned Telegram service and import explicitly selected people as fictional board units.", enabled: false, category: "mcp" },
       { id: "plugin-rag", name: "RAG World Update", description: "Append-only knowledge imports and deterministic NPC refresh.", enabled: true, category: "core" },
       { id: "plugin-map", name: "Google Maps World", description: "Google Maps preflight and real-map board foundation.", enabled: true, category: "visual" },
     ],
@@ -150,7 +167,7 @@ export function loadWorkspaceState(): UserWorkspaceState {
       chatMode: parsed.chatMode === "talk" || parsed.chatMode === "plan" || parsed.chatMode === "build" ? parsed.chatMode : defaults.chatMode,
       llmMoralSpectrum: clampMoralSpectrum(parsed.llmMoralSpectrum ?? defaults.llmMoralSpectrum),
       workflows: mergeDefaultWorkflows(Array.isArray(parsed.workflows) ? parsed.workflows : [], defaults.workflows),
-      plugins: Array.isArray(parsed.plugins) ? parsed.plugins : defaults.plugins,
+      plugins: mergeDefaultPlugins(Array.isArray(parsed.plugins) ? parsed.plugins : [], defaults.plugins),
       hyperlinks: Array.isArray(parsed.hyperlinks) ? parsed.hyperlinks : defaults.hyperlinks,
       assets: Array.isArray(parsed.assets) ? parsed.assets : [],
       repositories: Array.isArray(parsed.repositories) ? parsed.repositories : [],
@@ -197,7 +214,7 @@ export function buildLlmWorkspaceContext(stateInput = loadWorkspaceState()): str
     "BUILD MODE:",
     "- Produce only additive, reviewable changes based on the approved plan.",
     "- For board building, include one fenced JSON object using this optional schema:",
-    '{"notesAppend":"string","playerProfile":{"name":"string","biography":"string","personality":"string","traits":["string"],"avatarUrl":"optional https URL"},"phases":[{"name":"string","description":"string"}],"timelineEvents":[{"label":"string","description":"string","severity":"info|caution|critical"}],"entities":[{"label":"string","category":"unit|location|resource|objective|evidence|vehicle|civilian|event","faction":"police|criminal|neutral","notes":"string"}]}',
+    '{"notesAppend":"string","playerProfile":{"name":"string","biography":"string","personality":"string","traits":["string"],"avatarUrl":"optional https URL","avatarAssetId":"optional asset id"},"phases":[{"name":"string","description":"string"}],"timelineEvents":[{"label":"string","description":"string","severity":"info|caution|critical"}],"entities":[{"label":"string","category":"unit|location|resource|objective|evidence|vehicle|civilian|event","faction":"police|criminal|neutral","notes":"string"}]}',
     "- Omit sections that are not requested. Never delete or rewrite existing RAG, DeepSeek conversations or existing board content.",
     "- The user must press Apply before a board proposal becomes authoritative.",
   ].join("\n");
@@ -235,5 +252,11 @@ function describeMoralSpectrum(value: number): string {
 function mergeDefaultWorkflows(current: WorkspaceWorkflow[], defaults: WorkspaceWorkflow[]): WorkspaceWorkflow[] {
   const byId = new Map(current.map(workflow => [workflow.id, workflow]));
   for (const workflow of defaults) if (!byId.has(workflow.id)) byId.set(workflow.id, workflow);
+  return [...byId.values()];
+}
+
+function mergeDefaultPlugins(current: WorkspacePlugin[], defaults: WorkspacePlugin[]): WorkspacePlugin[] {
+  const byId = new Map(current.map(plugin => [plugin.id, plugin]));
+  for (const plugin of defaults) if (!byId.has(plugin.id)) byId.set(plugin.id, plugin);
   return [...byId.values()];
 }
