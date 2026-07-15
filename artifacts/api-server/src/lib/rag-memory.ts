@@ -3,8 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { recordObservabilityEvent } from "./observability";
 import { extractDocumentText, wisdomDocumentExtensions } from "./document-text";
+import { projectRoot } from "./project-root";
 
-const root = process.cwd();
+const root = projectRoot;
 const ragRoot = path.resolve(root, "rag");
 const runtimeDir = path.resolve(root, ".runtime");
 const memoryFile = path.join(runtimeDir, "rag-persistent-memory.json");
