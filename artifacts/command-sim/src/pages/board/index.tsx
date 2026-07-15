@@ -35,6 +35,7 @@ import { WorldMapUnderlay } from "./world-map-underlay";
 import { WorldSetupPanel } from "./world-setup-panel";
 import { GuidedTutorial } from "./guided-tutorial";
 import { SyndicateDashboard } from "./syndicate-dashboard";
+import { FamilyTreePanel } from "./family-tree-panel";
 import { MobileBoardWorkspace } from "./mobile-board-workspace";
 import { saveWorldConfig } from "@/lib/world-config";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ import {
   Network,
   PanelsTopLeft,
   Save,
+  UsersRound,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -83,6 +85,7 @@ export default function BoardPage() {
   const [developerPanelOpen, setDeveloperPanelOpen] = useState(false);
   const [worldSetupOpen, setWorldSetupOpen] = useState(false);
   const [syndicateOpen, setSyndicateOpen] = useState(false);
+  const [familyTreeOpen, setFamilyTreeOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [mapInteractive, setMapInteractive] = useState(false);
 
@@ -232,7 +235,8 @@ export default function BoardPage() {
           )}
           <HeaderButton active={mapInteractive} icon={mapInteractive ? Layers3 : MapIcon} label={mapInteractive ? "Board" : "Google map"} onClick={() => setMapInteractive(value => !value)} />
           <HeaderButton icon={PanelsTopLeft} label="Workspace" onClick={() => setLocation("/workspace")} />
-          <HeaderButton icon={Network} label="Family" onClick={() => setSyndicateOpen(true)} />
+          <HeaderButton icon={Network} label="Syndicate" onClick={() => setSyndicateOpen(true)} />
+          <HeaderButton icon={UsersRound} label="Family Tree" onClick={() => setFamilyTreeOpen(true)} />
           <HeaderButton icon={CircleHelp} label="Guide" onClick={() => setTutorialOpen(true)} />
           <HeaderButton icon={MapPin} label="World" onClick={() => setWorldSetupOpen(true)} />
           <HeaderButton icon={BarChart3} label="Analytics" onClick={() => setLocation("/analytics")} />
@@ -289,6 +293,7 @@ export default function BoardPage() {
       <DeveloperAiPanel open={developerPanelOpen} onClose={() => setDeveloperPanelOpen(false)} />
       <WorldSetupPanel open={worldSetupOpen} onClose={() => setWorldSetupOpen(false)} />
       <SyndicateDashboard open={syndicateOpen} board={board} onClose={() => setSyndicateOpen(false)} onChange={handleSyndicateChange} />
+      <FamilyTreePanel open={familyTreeOpen} board={board} onClose={() => setFamilyTreeOpen(false)} onChange={handleSyndicateChange} />
       <GuidedTutorial open={tutorialOpen} onClose={closeTutorial} scenarioName={scenarioName} city={board.world?.city} generatedSummary={board.generatedContent?.tutorialSummary} />
     </div>
   );
