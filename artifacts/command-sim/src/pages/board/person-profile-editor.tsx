@@ -1,12 +1,21 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BoardEntity, EntityProfile, PersonPresenceStatus } from "@/lib/game";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  WORKSPACE_UPDATED_EVENT,
+  loadWorkspaceState,
+  type UserWorkspaceState,
+  type WorkspaceAsset,
+} from "@/lib/workspace";
 import {
   CircleDollarSign,
   Clock3,
+  Image as ImageIcon,
   ShieldCheck,
   Upload,
   UserRound,
@@ -40,6 +49,8 @@ const STATUS_OPTIONS: Array<{ value: PersonPresenceStatus; label: string }> = [
 
 export function PersonProfileEditor({ entity, onUpdate }: PersonProfileEditorProps) {
   const [uploading, setUploading] = useState(false);
+  const [libraryAssets, setLibraryAssets] = useState<WorkspaceAsset[]>(() => imageAssets(loadWorkspaceState()));
+  const [selectedLibraryAssetId, setSelectedLibraryAssetId] = useState("");
   const profile = useMemo<EntityProfile>(
     () => ({ ...DEFAULT_PROFILE, ...entity.profile }),
     [entity.profile],
@@ -47,6 +58,19 @@ export function PersonProfileEditor({ entity, onUpdate }: PersonProfileEditorPro
   const accent = profile.accent ?? "#68a7ff";
   const status = profile.status ?? "unknown";
   const experience = profile.experience ?? [];
+
+  useEffect(() => {
+    const refresh = (event?: Event) => {
+      const custom = event as CustomEvent<UserWorkspaceState> | undefined;
+      setLibraryAssets(imageAssets(custom?.detail ?? loadWorkspaceState()));
+    };
+    window.addEventListener(WORKSPACE_UPDATED_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener(WORKSPACE_UPDATED_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
 
   const updateProfile = (patch: Partial<EntityProfile>) => {
     onUpdate({ profile: { ...profile, ...patch } });
@@ -69,6 +93,12 @@ export function PersonProfileEditor({ entity, onUpdate }: PersonProfileEditorPro
     } finally {
       setUploading(false);
     }
+  };
+
+  const useLibraryAsset = () => {
+    const asset = libraryAssets.find(item => item.id === selectedLibraryAssetId);
+    if (!asset) return;
+    updateProfile({ avatarAssetId: asset.sourceId, avatarUrl: asset.sourceUrl });
   };
 
   return (
@@ -106,7 +136,7 @@ export function PersonProfileEditor({ entity, onUpdate }: PersonProfileEditorPro
       <div className="flex flex-wrap items-center gap-2">
         <label className="inline-flex cursor-pointer items-center rounded-md border bg-background/65 px-2 py-1.5 text-[10px] shadow-sm hover:bg-accent">
           <Upload className="mr-1 h-3 w-3" />
-          {uploading ? "Uploading…" : "Profile image"}
+          {uploading ? "Uploading…" : "Upload profile image"}
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp"
@@ -128,6 +158,18 @@ export function PersonProfileEditor({ entity, onUpdate }: PersonProfileEditorPro
             onChange={event => updateProfile({ accent: event.target.value })}
           />
         </label>
+      </div>
+
+      <div className="rounded-lg border bg-background/55 p-2 shadow-inner">
+        <div className="mb-2 flex items-center gap-1 text-[10px] font-medium"><ImageIcon className="h-3.5 w-3.5" />Use universal account asset</div>
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <Select value={selectedLibraryAssetId} onValueChange={setSelectedLibraryAssetId}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={libraryAssets.length > 0 ? "Select ChatGPT, Grok or uploaded image" : "No synchronized image assets"} /></SelectTrigger>
+            <SelectContent>{libraryAssets.map(asset => <SelectItem key={asset.id} value={asset.id}>{asset.name} · {asset.origin}</SelectItem>)}</SelectContent>
+          </Select>
+          <Button size="sm" className="h-8" disabled={!selectedLibraryAssetId} onClick={useLibraryAsset}>Use</Button>
+        </div>
+        {profile.avatarAssetId && <div className="mt-1 truncate text-[9px] text-muted-foreground">Asset ID: {profile.avatarAssetId}</div>}
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -163,6 +205,10 @@ export function PersonProfileEditor({ entity, onUpdate }: PersonProfileEditorPro
       </div>
     </section>
   );
+}
+
+function imageAssets(state: UserWorkspaceState): WorkspaceAsset[] {
+  return state.assets.filter(asset => asset.mimeType.startsWith("image/")).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
