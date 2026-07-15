@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useListScenarios, useDeleteScenario, useCreateScenario } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Trash2, Plus, ChevronRight, Map, Sparkles, Loader2, Globe2, BookOpen, Box, MapPinned, Scale, Shield } from "lucide-react";
+import { Trash2, Plus, ChevronRight, Map, Sparkles, Loader2, Globe2, BookOpen, Box, MapPinned, Scale, Shield, Bot } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState, type MouseEvent } from "react";
@@ -20,6 +20,7 @@ import {
   type GeneratedGamePayload,
   type PlayerSide,
 } from "@/lib/game";
+import { loadWorkspaceState } from "@/lib/workspace";
 import { DEFAULT_WORLD_CONFIG, saveWorldConfig, type WorldConfig } from "@/lib/world-config";
 
 const EUROPE_PRESETS = [
@@ -76,6 +77,7 @@ export default function ScenarioList() {
   const [initialSpectrum, setInitialSpectrum] = useState(50);
   const [generating, setGenerating] = useState(false);
   const preset = EUROPE_PRESETS.find(item => item.id === presetId) ?? EUROPE_PRESETS[0]!;
+  const llmMoralSpectrum = loadWorkspaceState().llmMoralSpectrum;
 
   const handleDelete = async (id: number, event: MouseEvent) => {
     event.preventDefault();
@@ -91,6 +93,7 @@ export default function ScenarioList() {
 
   const generateGame = async () => {
     setGenerating(true);
+    const workspace = loadWorkspaceState();
     const world: WorldConfig = {
       ...DEFAULT_WORLD_CONFIG,
       country: preset.country,
@@ -119,7 +122,7 @@ export default function ScenarioList() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role: "story_director",
-          message: `Return ONLY valid JSON for a high-realism strategy game in ${preset.city}, ${preset.country}. Keys: storyline, openingMission, tutorialSummary, factions[{name,faction,role,goal}], assets[{name,type,description,district}], shops[{name,district,description,inventory[]}], skills[{name,description}], sourceCases[]. Include Red Team, Blue Team, neutral actors, shops, skills, assets and a five-act campaign. Player perspective: ${playerSide}. Self-reported moral spectrum: ${initialSpectrum}/100. This is an initial belief only; the deterministic game system changes it from actions, karma and risk. Premise: ${premise}`,
+          message: `Return ONLY valid JSON for a high-realism strategy game in ${preset.city}, ${preset.country}. Keys: storyline, openingMission, tutorialSummary, factions[{name,faction,role,goal}], assets[{name,type,description,district}], shops[{name,district,description,inventory[]}], skills[{name,description}], sourceCases[]. Include Red Team, Blue Team, neutral actors, shops, skills, assets and a five-act campaign. The authenticated player starts as the only member of the player faction, is the boss and has zero capital. Player perspective: ${playerSide}. Player self-reported moral spectrum: ${initialSpectrum}/100. LLM narrative moral stance selected by the user: ${workspace.llmMoralSpectrum}/100. The LLM stance affects fictional tone and trade-offs only; it cannot bypass schemas, permissions or deterministic rules. The player value is an initial belief only; actions, karma and risk move it later. Premise: ${premise}`,
           board: emptyBoard,
           history: [],
         }),
@@ -168,8 +171,8 @@ export default function ScenarioList() {
   };
 
   return (
-    <div className="container mx-auto py-10 px-4 max-w-5xl select-text">
-      <div className="flex justify-between items-center mb-8 border-b pb-4 gap-4">
+    <div className="container mx-auto max-w-5xl select-text px-4 py-10">
+      <div className="mb-8 flex items-center justify-between gap-4 border-b pb-4">
         <div><h1 className="text-3xl font-bold">Operation København</h1><p className="text-muted-foreground">AI-built European urban strategy simulator</p></div>
         <div className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={() => setLocation("/asset-lab")}><Box className="mr-2 h-4 w-4" />Asset Lab</Button>
@@ -185,15 +188,15 @@ export default function ScenarioList() {
 
               {step === 1 && (
                 <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                     {EUROPE_PRESETS.map(item => <Button key={item.id} variant={presetId === item.id ? "default" : "outline"} onClick={() => setPresetId(item.id)}><Globe2 className="mr-2 h-4 w-4" />{item.city}</Button>)}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div><Label>Radius km</Label><Input type="number" min={1} max={500} value={radius} onChange={event => setRadius(Number(event.target.value))} /></div>
-                    <div><Label>Map provider</Label><Input value="OpenStreetMap / Overpass" readOnly /></div>
+                    <div><Label>Map provider</Label><Input value="OpenStreetMap / Overpass + Google Maps base" readOnly /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {MAP_TEMPLATES.map(template => <button type="button" key={template.id} className={`border rounded p-3 text-left ${mapTemplateId === template.id ? "border-primary bg-primary/10" : ""}`} onClick={() => setMapTemplateId(template.id)}><strong>{template.name}</strong><div className="text-xs text-muted-foreground">{template.description}</div></button>)}
+                    {MAP_TEMPLATES.map(template => <button type="button" key={template.id} className={`rounded border p-3 text-left ${mapTemplateId === template.id ? "border-primary bg-primary/10" : ""}`} onClick={() => setMapTemplateId(template.id)}><strong>{template.name}</strong><div className="text-xs text-muted-foreground">{template.description}</div></button>)}
                   </div>
                 </div>
               )}
@@ -219,14 +222,14 @@ export default function ScenarioList() {
                     <input
                       aria-label="Initial moral spectrum"
                       type="range"
-                      min="0"
+                      min="1"
                       max="100"
                       step="1"
                       value={initialSpectrum}
-                      onChange={event => setInitialSpectrum(Number(event.target.value))}
+                      onChange={event => setInitialSpectrum(Math.max(1, Number(event.target.value)))}
                       className="w-full accent-primary"
                     />
-                    <div className="flex justify-between text-[10px] text-muted-foreground"><span>0 · destructive / evil</span><span>50 · mixed</span><span>100 · prosocial / good</span></div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground"><span>1 · destructive / evil</span><span>50 · mixed</span><span>100 · prosocial / good</span></div>
                     <div className="rounded bg-muted/40 p-3 text-sm">
                       <strong>{moralSpectrumLabel(initialSpectrum)}</strong>
                       <p className="mt-1 text-xs text-muted-foreground">This is self-reported initialization. Actions, risk, karma and outcomes move the live value afterward.</p>
@@ -244,12 +247,14 @@ export default function ScenarioList() {
               )}
 
               {step === 4 && (
-                <div className="py-6 space-y-3">
-                  <p>The compiler creates real-map anchored entities, persistent faction economy, shops, skills, campaign phases and turn simulation.</p>
+                <div className="space-y-3 py-6">
+                  <p>The compiler creates a Google Maps-backed board, real-world coordinates, persistent faction economy, shops, skills, campaign phases and turn simulation.</p>
                   <div className="grid gap-2 rounded border p-3 text-sm">
                     <span>World: {preset.city}, {preset.country} · {radius} km</span>
                     <span className="flex items-center gap-2"><Shield className="h-4 w-4" />Perspective: {playerSide}</span>
-                    <span className="flex items-center gap-2"><Scale className="h-4 w-4" />Initial spectrum: {initialSpectrum}/100 · {moralSpectrumLabel(initialSpectrum)}</span>
+                    <span className="flex items-center gap-2"><Scale className="h-4 w-4" />Player start: {initialSpectrum}/100 · {moralSpectrumLabel(initialSpectrum)}</span>
+                    <span className="flex items-center gap-2"><Bot className="h-4 w-4" />LLM stance: {llmMoralSpectrum}/100 · {moralSpectrumLabel(llmMoralSpectrum)}</span>
+                    <span>Authority: Boss · alone · 0 capital</span>
                   </div>
                 </div>
               )}
@@ -268,13 +273,13 @@ export default function ScenarioList() {
       {isLoading
         ? <div className="flex h-40 items-center justify-center"><Loader2 className="animate-spin" /></div>
         : scenarios?.length === 0
-          ? <div className="text-center py-20 border border-dashed rounded-xl"><Map className="mx-auto h-12 w-12 mb-4" /><h3 className="text-lg font-medium">No saved games</h3><Button className="mt-5" onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" />New Game</Button></div>
-          : <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          ? <div className="rounded-xl border border-dashed py-20 text-center"><Map className="mx-auto mb-4 h-12 w-12" /><h3 className="text-lg font-medium">No saved games</h3><Button className="mt-5" onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" />New Game</Button></div>
+          : <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {scenarios?.map(scenario => (
                 <Link key={scenario.id} href={`/board/${scenario.id}`}>
-                  <Card className="h-full cursor-pointer">
+                  <Card className="h-full cursor-pointer border-border/70 bg-[linear-gradient(145deg,hsl(var(--card)),hsl(var(--muted)/0.22))] shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
                     <CardHeader><div className="flex justify-between"><CardTitle>{scenario.name}</CardTitle><Button variant="ghost" size="icon" onClick={event => handleDelete(scenario.id, event)}><Trash2 className="h-4 w-4" /></Button></div><CardDescription>{scenario.description}</CardDescription></CardHeader>
-                    <CardContent><Map className="inline mr-2 h-3 w-3" />{MAP_TEMPLATES.find(item => item.id === scenario.mapTemplateId)?.name ?? "World"}</CardContent>
+                    <CardContent><Map className="mr-2 inline h-3 w-3" />{MAP_TEMPLATES.find(item => item.id === scenario.mapTemplateId)?.name ?? "World"}</CardContent>
                     <CardFooter className="justify-between text-xs"><span>{format(new Date(scenario.updatedAt), "MMM d, yyyy")}</span><span className="flex">Open<ChevronRight className="h-3 w-3" /></span></CardFooter>
                   </Card>
                 </Link>
