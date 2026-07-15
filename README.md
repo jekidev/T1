@@ -82,6 +82,57 @@ pnpm rag:sync
 
 The sync script copies supported documents into `rag/inbox`, removes duplicates by SHA-256, and writes `rag/inbox/manifest.json`.
 
+## Hourly everyday-wisdom heads-up
+
+Put source documents in:
+
+```text
+rag/wisdom/common/everyday tips
+```
+
+The server synchronizes that subfolder into persistent RAG memory and generates one LLM heads-up every hour. Supported inputs are Markdown, text, JSON, CSV, YAML, PDF, DOCX and legacy DOC when `antiword` is installed.
+
+PDF extraction uses the existing Python knowledge dependency:
+
+```bash
+pip install -r requirements-knowledge.txt
+```
+
+The board displays heads-ups through an SSE stream. Press the bell button in the heads-up dock to allow normal browser notifications while the app is open. Generate one immediately with:
+
+```bash
+curl -X POST http://localhost:8080/api/llm/headsup/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"balanced"}'
+```
+
+## User LLM modes
+
+The board provides three user-facing modes:
+
+| Mode | Behavior |
+|---|---|
+| **Light** | Quiet mode: hourly wisdom and concise user-led advisor replies. |
+| **Balanced** | Hourly wisdom plus short coaching after meaningful turns. |
+| **Uber** | Active commentary on game-state changes and throttled review-only potential PR proposals. |
+
+Uber proposals are stored by model under:
+
+```text
+rag/Code/LLM_scripts/<model-slug>/<timestamp>-potential-pr.md
+```
+
+They are not executed, committed or opened as pull requests automatically. Each artifact is a reviewable patch sketch with evidence, validation, rollback and game-state continuation notes. The output is synchronized back into RAG so later development sessions can continue from reviewed proposals.
+
+Configuration is documented in `.env.example`, including:
+
+- `WISDOM_RAG_SUBFOLDER`
+- `HEADS_UP_INTERVAL_MS`
+- `HEADS_UP_DEFAULT_MODE`
+- `LLM_SCRIPT_OUTPUT_DIR`
+- `UBER_SCRIPT_INTERVAL_MS`
+- `UBER_SOURCE_MAX_CHARS`
+
 ## Local / Termux
 
 ```bash
