@@ -18,10 +18,8 @@ export function installNetworkPermissionGuard(): void {
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = input instanceof Request ? input : undefined;
-    const url = new URL(
-      request?.url ?? (input instanceof URL ? input.toString() : input),
-      window.location.href,
-    );
+    const rawUrl = request ? request.url : input instanceof URL ? input.toString() : String(input);
+    const url = new URL(rawUrl, window.location.href);
     const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
 
     if (
