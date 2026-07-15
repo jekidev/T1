@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { projectRoot } from "./project-root";
 
 const execFileAsync = promisify(execFile);
 const directTextExtensions = new Set([".md", ".txt", ".text", ".json", ".csv", ".yaml", ".yml"]);
@@ -43,13 +44,14 @@ export async function extractDocumentText(file: string, maxCharacters = 120_000)
     return { content: "", extraction: "unavailable", warning: `Unsupported document extension: ${extension || "none"}` };
   }
 
-  const helper = path.resolve(process.cwd(), "scripts/extract_document.py");
+  const helper = path.resolve(projectRoot, "scripts/extract_document.py");
   const pythonCommands = [process.env.PYTHON_BIN?.trim(), "python3", "python"].filter((value): value is string => Boolean(value));
   const failures: string[] = [];
 
   for (const command of [...new Set(pythonCommands)]) {
     try {
       const { stdout } = await execFileAsync(command, [helper, file, "--max-chars", String(maxCharacters)], {
+        cwd: projectRoot,
         timeout: 45_000,
         maxBuffer: Math.max(1_000_000, maxCharacters * 2),
       });
