@@ -1,4 +1,5 @@
 const ULTRA_CONFIRMATION = "ENABLE ULTRA" as const;
+const APPROVAL_CONFIRMATION = "APPROVE NETWORK" as const;
 const NETWORK_SESSION_PATH = /^\/api\/network\/sessions(?:\/[^/]+)?$/;
 const NETWORK_APPROVAL_PATH = /^\/api\/network\/sessions\/[^/]+\/approvals\/[^/]+$/;
 
@@ -8,9 +9,9 @@ let permissionToken: string | null = null;
 /**
  * Installs a fail-closed browser boundary for network approvals and Ultra.
  *
- * The administrator token is requested through a browser prompt, retained only
- * in this module's memory and attached as a header. It is never written to
- * localStorage, the request body, chat context, RAG or application state.
+ * Every approval requires a fresh interactive phrase. The administrator token
+ * may remain in module memory for the tab lifetime, but background code cannot
+ * use it because this wrapper always pauses for a user confirmation first.
  */
 export function installNetworkPermissionGuard(): void {
   if (installed || typeof window === "undefined") return;
@@ -36,9 +37,9 @@ export function installNetworkPermissionGuard(): void {
     const headers = new Headers(init?.headers ?? request?.headers);
     let nextBody = rawBody;
 
-    if (isUltraChange && !hasValidUltraApproval(body?.ultraApproval)) {
+    if (isUltraChange) {
       const entered = window.prompt(
-        "Ultra giver denne midlertidige session adgang til alle offentlige HTTPS-kilder. Private netværk, metadata-endpoints og secrets er stadig blokeret. Skriv ENABLE ULTRA for at godkende.",
+        "Ultra giver denne midlertidige session adgang til alle offentlige HTTPS-kilder. Private netværk, metadata-endpoints og secrets er stadig blokeret. Skriv ENABLE ULTRA for at godkende denne konkrete opgradering.",
         "",
       );
       if (entered !== ULTRA_CONFIRMATION) {
@@ -49,6 +50,16 @@ export function installNetworkPermissionGuard(): void {
         ultraApproval: { confirmation: ULTRA_CONFIRMATION },
       });
       headers.set("Content-Type", "application/json");
+    }
+
+    if (isApproval) {
+      const entered = window.prompt(
+        "Godkend den viste Ask First-netværksanmodning. Skriv APPROVE NETWORK for at fortsætte.",
+        "",
+      );
+      if (entered !== APPROVAL_CONFIRMATION) {
+        throw new DOMException("The network request was not explicitly approved.", "NotAllowedError");
+      }
     }
 
     if (!headers.has("X-Network-Permission-Token")) {
@@ -86,10 +97,4 @@ function parseJsonObject(body: BodyInit | null | undefined): Record<string, unkn
   } catch {
     return undefined;
   }
-}
-
-function hasValidUltraApproval(value: unknown): boolean {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const approval = value as Record<string, unknown>;
-  return approval.confirmation === ULTRA_CONFIRMATION;
 }
