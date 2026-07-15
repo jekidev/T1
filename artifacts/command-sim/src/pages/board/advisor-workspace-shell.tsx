@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { AdvisorPanel as LegacyAdvisorPanel } from "./advisor-panel";
+import { FamilyTreePanel } from "./family-tree-panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_ATTRIBUTES, useBoardStore, type BoardEntity, type EntityCategory, type Faction } from "@/lib/game";
 import { loadWorkspaceState, saveWorkspaceState, type LlmWorkspaceMode } from "@/lib/workspace";
-import { Blocks, Hammer, MessageCircle, Network, ScrollText } from "lucide-react";
+import { Blocks, Hammer, MessageCircle, Network, ScrollText, UsersRound } from "lucide-react";
 
 interface BuildProposal {
   notesAppend?: string;
@@ -23,6 +24,7 @@ export function AdvisorWorkspaceShell() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [workspace, setWorkspace] = useState(() => loadWorkspaceState());
   const [workflowId, setWorkflowId] = useState("workflow-create-storyline");
+  const [familyOpen, setFamilyOpen] = useState(false);
   const { board, loadBoard, scenarioId, scenarioName, scenarioDescription } = useBoardStore();
   const { toast } = useToast();
 
@@ -104,16 +106,7 @@ export function AdvisorWorkspaceShell() {
     if (!board.simulation?.teamDynamics || (board.simulation.turn ?? 0) > 0) return;
     const safe = Math.max(1, Math.min(100, value));
     const dynamics = board.simulation.teamDynamics;
-    const next = {
-      ...board,
-      simulation: {
-        ...board.simulation,
-        teamDynamics: {
-          ...dynamics,
-          userProfile: { ...dynamics.userProfile, initialSpectrum: safe, currentSpectrum: safe, lastChange: 0 },
-        },
-      },
-    };
+    const next = { ...board, simulation: { ...board.simulation, teamDynamics: { ...dynamics, userProfile: { ...dynamics.userProfile, initialSpectrum: safe, currentSpectrum: safe, lastChange: 0 } } } };
     loadBoard(next, scenarioId, scenarioName, scenarioDescription);
   };
 
@@ -128,10 +121,11 @@ export function AdvisorWorkspaceShell() {
           <Button size="sm" variant={workspace.chatMode === "plan" ? "default" : "outline"} className="h-8 text-[10px] shadow-sm" onClick={() => setMode("plan")}><ScrollText className="mr-1 h-3.5 w-3.5" />Plan</Button>
           <Button size="sm" variant={workspace.chatMode === "build" ? "default" : "outline"} className="h-8 text-[10px] shadow-sm" onClick={() => setMode("build")}><Hammer className="mr-1 h-3.5 w-3.5" />Build</Button>
         </div>
-        <div className="grid grid-cols-[1fr_auto_auto] gap-1">
+        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-1">
           <Select value={workflowId} onValueChange={setWorkflowId}><SelectTrigger className="h-8 text-[10px]"><SelectValue /></SelectTrigger><SelectContent>{workspace.workflows.map(workflow => <SelectItem key={workflow.id} value={workflow.id}>{workflow.name}</SelectItem>)}</SelectContent></Select>
           <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={loadWorkflowPrompt}><Network className="mr-1 h-3.5 w-3.5" />Load</Button>
-          <Button size="sm" variant="outline" className="h-8 text-[10px]" disabled={workspace.chatMode !== "build"} onClick={applyLastBuild}><Blocks className="mr-1 h-3.5 w-3.5" />Apply last build</Button>
+          <Button size="sm" variant="outline" className="h-8 text-[10px]" disabled={workspace.chatMode !== "build"} onClick={applyLastBuild}><Blocks className="mr-1 h-3.5 w-3.5" />Apply</Button>
+          <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => setFamilyOpen(true)}><UsersRound className="mr-1 h-3.5 w-3.5" />Family</Button>
         </div>
         <div className="rounded-lg border bg-background/60 px-2 py-1.5 shadow-inner">
           <div className="flex items-center justify-between text-[9px]"><span>Good / evil moral spectrum at startup</span><div className="flex items-center gap-2"><Badge variant="outline">{Math.round(morals)}/100</Badge>{lockedMorals && <span className="text-muted-foreground">locked after turn 0</span>}</div></div>
@@ -140,13 +134,14 @@ export function AdvisorWorkspaceShell() {
         </div>
       </div>
       <div className="min-h-0 flex-1"><LegacyAdvisorPanel /></div>
+      <FamilyTreePanel open={familyOpen} board={board} onClose={() => setFamilyOpen(false)} onChange={next => loadBoard(next, scenarioId, scenarioName, scenarioDescription)} />
     </div>
   );
 }
 
 function parseBuildProposal(text: string): BuildProposal | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
-  const start = text.lastIndexOf("{");
+  const start = text.indexOf("{");
   const candidate = fenced ?? (start >= 0 ? text.slice(start) : "");
   try {
     const parsed = JSON.parse(candidate) as BuildProposal;
