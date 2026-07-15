@@ -22,6 +22,7 @@ import {
   runBoardBlackmailAction,
   type BoardBlackmailAction,
 } from "@/lib/strategy/boardStrategyBridge";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { CommandCanvas } from "./canvas";
 import { PaletteSidebar } from "./sidebar-left";
@@ -62,6 +63,7 @@ export default function BoardPage() {
   const scenarioId = isTutorial ? null : parseInt(id || "0");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const scenarioQuery = useGetScenario(scenarioId!, {
     query: {
       enabled: !isTutorial && !!scenarioId,
@@ -241,7 +243,7 @@ export default function BoardPage() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        <div className="hidden h-full lg:block">
+        {isDesktop ? (
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={15} minSize={10}><PaletteSidebar /></ResizablePanel>
             <ResizableHandle withHandle />
@@ -274,14 +276,14 @@ export default function BoardPage() {
               </ResizablePanelGroup>
             </ResizablePanel>
           </ResizablePanelGroup>
-        </div>
-
-        <MobileBoardWorkspace
-          board={board}
-          mapInteractive={mapInteractive}
-          onResolve={resolveTurn}
-          onBlackmail={resolveBlackmail}
-        />
+        ) : (
+          <MobileBoardWorkspace
+            board={board}
+            mapInteractive={mapInteractive}
+            onResolve={resolveTurn}
+            onBlackmail={resolveBlackmail}
+          />
+        )}
       </div>
 
       <DeveloperAiPanel open={developerPanelOpen} onClose={() => setDeveloperPanelOpen(false)} />
