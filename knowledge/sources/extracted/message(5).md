@@ -9,98 +9,68 @@
 
 SIGNAL 
  
-https://signal.group/#CjQKILCjY6rE0hZp30phDWHF5-IECkJWbq8b7aT_zkapq26eEhBhjs6JyXn
-hP1w4whAMYtKr 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIJrqFD-t9ZtwTv_KPI57k4EpIMA8nyx9G4yAZ1h53eOgEhB1IA0h8Flk
-5ftHUbWksMnN 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKICe6tSZuQJvyo-xEq9fErS2_3Kv63i2kWhPxtQLIURDCEhAkz9sxJZh
-qbbC6GM5NcXig 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIATGnNsS4__4qKEw2HZDvtLDb6nS5U9Wlc7eA4uZBYweEhAhrdrO
-90e2L8QgI7wvjj9c 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIPP8qck0FNJ2hZ6C8xOY9cYZ79K6o7p3pcZuC-X5lS3yEhB9noeMv
-YUb13pYGIgpGKrb 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIM5k3z9ftFEP8QUkivRNEQQxcDEtEogB9FNUvqQoIYcAEhDGUtdK
-hme9mRPupyAcOk1H 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIMTFZEtrC03aZ4EbKzKcu8lmFYf3212SMBZMMYlJ5Fw5EhDvrCT3h
-MAubDjE7tFYCTyS 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIJnnwBdC8hnvbFdKnfYHQXnnIfb_ng3q31CHuMwb7XZoEhBpWa8P
-CvoAL2bYdczcd_Wb 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIBAdMkaSZnJuwLeKVlBll9hu6XLknR4ZREDIGrUR2gLtEhBKsr4UuhviY6wNoN5p1zY 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIN48k3fOQfP-Bj8EXjOe8S8EMa05pLzGE2FIGaTvhbAzEhBsFOxVIV
-Dhth2ozc_2X-Mx 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIE2aLFsqVhcg_kPgZFeuxdWQlr17hoGwvbHeYQYK6gIyEhDxh_2j5
-GSNXoiDNzIx7b5E 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIGX_SotAuJwd2JnGK0JSEnhZKD9mFrNQtUa2-utbIx9wEhC6YgCJu
-_wsFXV_OPlkXiAh 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIMeNzfvcLkf3ED0FBdiEelvRvyd9AvbZCMx6pTwRm1A0EhC2CuyFo
-wu4qkZtjZcgyHv8 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIOEOCY76yCxaDfuYoxrRS6wlFFwxqQWKnWjXi-621vphEhDGi-ajjvD
-tv1eno2chQZ0B
+[REDACTED-SIGNAL-GROUP-INVITE]
 
 ## Page 2
 
-https://signal.group/#CjQKIKW69yZg0GPW_lmqdlbSqZ8qW_ZiQG3UlCZ4tr-SZuksEhBhEEUV_
-KBs5gQqgjdVjWIy 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKINkIS4A25cBDZMvAcz_i3o0_NNRHddAP0AyTd2He7GstEhDuAMrv5
-e9NGwRXXP9Vl6go 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIISLHUII48rU2lJY0nnZS1sG0F9D4ilbjbb6kKgKhmDGEhC4R9l0mZB
-1zqfBh40oxnxQ 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIP6yR1xHRhtGfaeIMV0427GY78eVVcDykdEQ13qw-GEBEhAyMuftO
-dl6-siHkiXEwpYQ 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIFB8dOOO6zl8mC7D0Ds1kO4EPZjphm-QuGkDNR3DUP9XEhCzvE
-Xcr0x7jQRmaEW3uA-s 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIGcKR1oUdlFDpf5EMX9v49wLCcWqJhbcbSItw3vyBI4QEhB0Fq4LI0
-HzKvNhbpZiIKA_ 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIFSgOhfXKKtJH0W-55rwfgzip4BU8Dur1iijqVhf8B7ZEhDBKBzAGAO
-udxfWRjska44p 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIN48k3fOQfP-Bj8EXjOe8S8EMa05pLzGE2FIGaTvhbAzEhBsFOxVIV
-Dhth2ozc_2X-Mx 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIDExu_1cYmRBydE9zCLgG0x3NAYUU1eCJUIkwVri-IGzEhBXmM9v
-XUq_H5tIPFb601u2 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIOZj623rMQwgS6wuEirp4bdvUYK2ivSO-KtTi3Kob7BMEhA5jpoQGg
-dwptgc5xTNFim2 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIIdOIolkNeTi78FMZbZiGhNzX5w3y6VlQSVS5LC3C9bWEhBs2dJWE
-cu2q7lcltYrmx7J 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIBusx82V5K6yoROf53OeflKagGovQo7hZM9zBWdxehYWEhAmDD8
-uAnq7n7RVhHmuCRA0 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIOE4lfddpAvk6-WpjKDBakYwVBVOFzOuOW1izVWNVyz7EhBiabheb
-PZV3GxRJbqzYXIy 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIH7g6XoVcF5Ht8P67YATL-5WkAQwFYT36fLCxDYv4rEoEhCr-2kD9x
-sQnx_EjQWqtD_F
+[REDACTED-SIGNAL-GROUP-INVITE]
 
 ## Page 3
 
-https://signal.group/#CjQKIJnnwBdC8hnvbFdKnfYHQXnnIfb_ng3q31CHuMwb7XZoEhBpWa8P
-CvoAL2bYdczcd_Wb 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKIM_wk4OPzW__OuhjWZZpDAbwl_LKbLcuvpty2mAfDaZJEhA5Yls6u
-RJWwP57zJ482-vQ 
+[REDACTED-SIGNAL-GROUP-INVITE] 
  
-https://signal.group/#CjQKICOeDWKGsN_Y5caNX6oHQ8jlUrLfqdM5CDwGFrayj7I6EhCPsyOjp
-BfmR5LRu638cIJl
+[REDACTED-SIGNAL-GROUP-INVITE]

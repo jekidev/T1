@@ -21,32 +21,32 @@
     {
       "sha256_a": "8a4f8a4359b4797d01e4302a99164482906fc1f18c037e5109047fb8197d50ba",
       "sha256_b": "94eb8ab6fdd4763b0183cea2fd269d67499fc1e5696f06ebc3aa04eb201bf0cd",
-      "similarity": 0.8309
+      "similarity": 0.8157
     },
     {
       "sha256_a": "f93a49302ee9454ca9521cc7a38e3a282f44153c0043d90a4f219edfac945508",
       "sha256_b": "1ae193ba52da4f19a06b97145ef77f86526866cb753878bb5a4d3e2521a800c5",
-      "similarity": 1.0
+      "similarity": 0.5385
     },
     {
       "sha256_a": "1e4b8a1f651f57d98fe1d6867a491ef87ccd1657103a4dd6ff27c8cc93b60458",
       "sha256_b": "9a1070676e214ed4fdd6dcaeb60fee379f09ed8bba54ff5b7ee4b684ac39fd61",
-      "similarity": 1.0
+      "similarity": 0.7707
     },
     {
       "sha256_a": "1e4b8a1f651f57d98fe1d6867a491ef87ccd1657103a4dd6ff27c8cc93b60458",
       "sha256_b": "485a709104692d498168d436fe6f62ef4cd3db5af9e2abd689c6e5ced74d4b38",
-      "similarity": 0.7831
+      "similarity": 0.3156
     },
     {
       "sha256_a": "9a1070676e214ed4fdd6dcaeb60fee379f09ed8bba54ff5b7ee4b684ac39fd61",
       "sha256_b": "485a709104692d498168d436fe6f62ef4cd3db5af9e2abd689c6e5ced74d4b38",
-      "similarity": 0.7831
+      "similarity": 0.2517
     },
     {
       "sha256_a": "faa67b19df5d37a31b2781aade7f74c932e7813222ff2bba82c0197611af04b8",
       "sha256_b": "eb161cb8089d92437baca1f745f375907dea3eb0e850021373dcdcdf6f3217b2",
-      "similarity": 1.0
+      "similarity": 0.6791
     }
   ],
   "duplicate_chunk_groups": [
@@ -2871,5 +2871,6 @@
         "4995385234779b58-p0064-c001"
       ]
     }
-  ]
+  ],
+  "near_duplicate_similarity_method": "word 3-gram Jaccard over extracted page text"
 }
