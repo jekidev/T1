@@ -12,6 +12,8 @@ export type EntityCategory = "unit" | "location" | "resource" | "barrier" | "obj
 export interface EntityAttributes { mobility: number; visibility: number; intelligence: number; influence: number; resources: number; readiness: number; legalAuthority: number; risk: number; morale: number; }
 export const DEFAULT_ATTRIBUTES: EntityAttributes = { mobility: 50, visibility: 50, intelligence: 50, influence: 50, resources: 50, readiness: 50, legalAuthority: 0, risk: 30, morale: 60 };
 
+export type PersonPresenceStatus = "online" | "busy" | "offline" | "unknown";
+
 export interface EntityProfile {
   avatarAssetId?: string;
   avatarUrl?: string;
@@ -19,6 +21,14 @@ export interface EntityProfile {
   biography: string;
   traits: string[];
   source: "manual" | "telegram_mcp" | "generated";
+  username?: string;
+  role?: string;
+  status?: PersonPresenceStatus;
+  lastSeen?: string;
+  experience?: string[];
+  walletMinor?: number;
+  maximumRecordedWalletMinor?: number;
+  accent?: string;
 }
 
 export interface BoardEntity {
@@ -57,6 +67,30 @@ export interface GeneratedShop { name: string; district: string; description: st
 export interface GeneratedSkill { name: string; description: string; }
 export interface GeneratedGameContent { generatedAt: string; generatedBy: string; premise: string; storyline: string; openingMission: string; tutorialSummary: string; factions: GeneratedFaction[]; assets: GeneratedAsset[]; shops: GeneratedShop[]; skills: GeneratedSkill[]; sourceCases: string[]; rawModelOutput?: string; validationWarnings?: string[]; }
 export interface BoardWorldState { country: string; region: string; municipality: string; city: string; latitude: number; longitude: number; workAreaRadiusKm: number; mapProvider: "google" | "openstreetmap"; language: string; currency: string; timezone: string; }
+
+export type SceneWeather = "sun" | "rain" | "cloudy" | "fog" | "snow";
+export type SceneSeason = "spring" | "summer" | "autumn" | "winter";
+export type SceneMapMode = "local" | "google" | "openstreetmap";
+export interface BoardEnvironmentState {
+  sceneName: string;
+  weather: SceneWeather;
+  season: SceneSeason;
+  localTime: string;
+  temperatureC: number;
+  mapMode: SceneMapMode;
+}
+
+export function createDefaultEnvironment(): BoardEnvironmentState {
+  return {
+    sceneName: "Local fallback scene",
+    weather: "cloudy",
+    season: "autumn",
+    localTime: "21:00",
+    temperatureC: 10,
+    mapMode: "local",
+  };
+}
+
 export interface FactionState { id: string; name: string; faction: Faction; treasury: number; personnel: number; cohesion: number; legitimacy: number; intelligence: number; suspicion: number; territories: string[]; relationships: Record<string, number>; objectives: string[]; }
 export interface ShopState { id: string; name: string; district: string; reputationRequired: number; scarcity: number; pressure: number; inventory: Array<{ id: string; name: string; price: number; stock: number; quality: number }>; }
 export interface SkillState { id: string; name: string; level: number; experience: number; description: string; }
@@ -92,6 +126,7 @@ export interface BoardState {
   moveHistory: MoveLogEntry[];
   notes: string;
   world?: BoardWorldState;
+  environment?: BoardEnvironmentState;
   generatedContent?: GeneratedGameContent;
   simulation?: SimulationState;
   playerWorkspace?: PlayerWorkspaceState;
@@ -103,7 +138,7 @@ export interface BoardState {
 export function createEmptyBoard(mapTemplateId: string): BoardState {
   const planningPhaseId = "phase-planning";
   return {
-    version: 6,
+    version: 7,
     mapTemplateId,
     zones: [],
     entities: [],
@@ -113,6 +148,7 @@ export function createEmptyBoard(mapTemplateId: string): BoardState {
     timelineEvents: [],
     moveHistory: [],
     notes: "",
+    environment: createDefaultEnvironment(),
     playerWorkspace: { role: "boss", startedAlone: true, startingCapital: 0, ownedAssetIds: [], createdAt: new Date().toISOString() },
     sources: [],
     tutorialCompleted: false,
