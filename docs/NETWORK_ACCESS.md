@@ -35,6 +35,8 @@ The second credential must match the server-side `NETWORK_PERMISSION_ADMIN_TOKEN
 
 The browser requests the administrator token only when the user approves a request or enables Ultra. It is retained in module memory only. It is not written to local storage, request bodies, chat history, RAG, replay data or game state. Production use requires HTTPS.
 
+Caching the administrator token does not make later decisions automatic. Every approval still pauses for a new interactive confirmation, and every Ultra upgrade still requires a new interactive Ultra confirmation.
+
 ## Ask First
 
 ### RAG and book imports
@@ -47,9 +49,15 @@ Each external request exposes:
 - reason
 - expiry
 
-The user approves or denies that matching target. Approval requires the separate network-permission administrator credential. An approval remains valid only for the same exact capability, origin, path and query during the temporary session. A different file, query or redirect destination creates a separate authorization decision and is DNS-validated again.
+The user approves or denies that matching target. The browser requires the exact phrase below for every approval:
 
-This session-scoped behavior avoids redirect approval loops without granting origin-wide access.
+```text
+APPROVE NETWORK
+```
+
+Approval also requires the separate network-permission administrator credential. An approval remains valid only for the same exact capability, origin, path and query during the temporary session. A different file, query or redirect destination creates a separate authorization decision and is DNS-validated again.
+
+This session-scoped behavior avoids redirect approval loops without granting origin-wide access. Background code cannot silently reuse a previously entered administrator token because the global fetch boundary requires a new interactive phrase for every approval action.
 
 ### Coding-agent runs
 
@@ -81,13 +89,15 @@ issue_tracker
 
 Ultra is never the default. Application network sessions require both:
 
-1. the exact interactive confirmation phrase:
+1. the exact interactive confirmation phrase for every concrete upgrade:
 
 ```text
 ENABLE ULTRA
 ```
 
 2. a valid `NETWORK_PERMISSION_ADMIN_TOKEN` sent only in `X-Network-Permission-Token`.
+
+The phrase is requested even if request code already placed an `ultraApproval` object in the body. This prevents background code from replaying the text and silently using a cached administrator credential.
 
 The server derives and records the approving actor and timestamp. Client-supplied `approvedBy` values are not trusted. Possession of an LLM prompt, AI profile, session token or agent tool is not sufficient to enable Ultra. The browser installs one global permission guard, so current and future UI components pass through the same confirmation and administrator-credential boundary.
 
@@ -182,7 +192,7 @@ Source files are append-only. Changed upstream content receives a content-addres
 
 ## UI
 
-The Developer AI panel contains Ask First/Ultra, explicit Ultra confirmation, book/import controls and Update the world.
+The Developer AI panel contains Ask First/Ultra, explicit per-action confirmation, book/import controls and Update the world.
 
 The coding-agent inspector contains approved hosts, capability controls and a firewall-audit view. Network-session and administrator tokens remain in component memory and are blocked from session replay.
 
@@ -197,4 +207,4 @@ CODING_AGENT_ADMIN_TOKEN=<separate random secret with at least 24 characters>
 
 Use different values. Do not expose either value through `VITE_*`, frontend bundles, chat prompts, RAG, logs or game saves.
 
-The strongest “cannot bypass” property depends on the worker network topology. The worker must have no direct public route outside the controlled firewall/egress proxy. The application contract and audit reject policy violations, but they do not replace infrastructure isolation.
+The strongest “cannot bypass” property depends on the worker network topology and application integrity. The worker must have no direct public route outside the controlled firewall/egress proxy, and the deployed frontend must be protected against unauthorized script injection. The application contract and audit reject policy violations, but they do not replace infrastructure isolation, HTTPS or XSS protection.
