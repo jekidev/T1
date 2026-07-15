@@ -66,6 +66,7 @@ export function normalizeBoardPresentation(board: BoardState): BoardState {
 function normalizePersonEntity(entity: BoardEntity): BoardEntity {
   if (entity.category !== "unit" && entity.category !== "civilian") return entity;
   const existing = entity.profile;
+  const existingAccent = existing?.accent;
   const walletMinor = Math.max(0, finiteNumber(existing?.walletMinor));
   const profile: EntityProfile = {
     personality: existing?.personality ?? "Personality develops through game events and player interaction.",
@@ -82,7 +83,7 @@ function normalizePersonEntity(entity: BoardEntity): BoardEntity {
       finiteNumber(existing?.maximumRecordedWalletMinor),
       walletMinor,
     ),
-    accent: isAccent(existing?.accent) ? existing!.accent : factionAccent(entity.faction),
+    accent: isAccent(existingAccent) ? existingAccent : factionAccent(entity.faction),
     ...(existing?.avatarAssetId ? { avatarAssetId: existing.avatarAssetId } : {}),
     ...(existing?.avatarUrl ? { avatarUrl: existing.avatarUrl } : {}),
   };
