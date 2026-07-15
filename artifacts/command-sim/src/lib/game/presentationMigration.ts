@@ -3,6 +3,7 @@ import {
   type BoardEntity,
   type BoardState,
   type EntityProfile,
+  type PersonPresenceStatus,
 } from "./types";
 
 export function boardNeedsPresentationMigration(board: BoardState): boolean {
@@ -10,10 +11,10 @@ export function boardNeedsPresentationMigration(board: BoardState): boolean {
   if (!board.environment) return true;
   const environment = board.environment;
   if (
-    !environment.sceneName
+    !environment.sceneName.trim()
     || !environment.weather
     || !environment.season
-    || !environment.localTime
+    || !/^\d{2}:\d{2}$/.test(environment.localTime)
     || !environment.mapMode
     || !Number.isFinite(environment.temperatureC)
   ) {
@@ -23,35 +24,40 @@ export function boardNeedsPresentationMigration(board: BoardState): boolean {
     if (entity.category !== "unit" && entity.category !== "civilian") return false;
     const profile = entity.profile;
     return !profile
-      || !profile.username
-      || !profile.role
+      || !profile.username?.trim()
+      || !profile.role?.trim()
       || !profile.status
-      || !profile.lastSeen
+      || !profile.lastSeen?.trim()
       || !Array.isArray(profile.experience)
       || profile.walletMinor === undefined
       || profile.maximumRecordedWalletMinor === undefined
-      || !profile.accent;
+      || !isAccent(profile.accent);
   });
 }
 
 export function normalizeBoardPresentation(board: BoardState): BoardState {
-  const defaultEnvironment = createDefaultEnvironment();
-  const mapMode = board.world?.mapProvider === "google"
+  const defaults = createDefaultEnvironment();
+  const preferredMapMode = board.world?.mapProvider === "google"
     ? "google"
     : board.world?.mapProvider === "openstreetmap"
       ? "openstreetmap"
-      : defaultEnvironment.mapMode;
+      : defaults.mapMode;
+  const environment = board.environment;
 
   return {
     ...board,
     version: Math.max(7, board.version || 0),
     environment: {
-      ...defaultEnvironment,
-      ...(board.world ? {
-        sceneName: `${board.world.city} scene`,
-        mapMode,
-      } : {}),
-      ...board.environment,
+      sceneName: environment?.sceneName?.trim() || (board.world ? `${board.world.city} scene` : defaults.sceneName),
+      weather: environment?.weather ?? defaults.weather,
+      season: environment?.season ?? defaults.season,
+      localTime: environment?.localTime && /^\d{2}:\d{2}$/.test(environment.localTime)
+        ? environment.localTime
+        : defaults.localTime,
+      temperatureC: Number.isFinite(environment?.temperatureC)
+        ? Math.max(-60, Math.min(60, environment!.temperatureC))
+        : defaults.temperatureC,
+      mapMode: environment?.mapMode ?? preferredMapMode,
     },
     entities: board.entities.map(entity => normalizePersonEntity(entity)),
   };
@@ -60,22 +66,23 @@ export function normalizeBoardPresentation(board: BoardState): BoardState {
 function normalizePersonEntity(entity: BoardEntity): BoardEntity {
   if (entity.category !== "unit" && entity.category !== "civilian") return entity;
   const existing = entity.profile;
+  const walletMinor = Math.max(0, finiteNumber(existing?.walletMinor));
   const profile: EntityProfile = {
     personality: existing?.personality ?? "Personality develops through game events and player interaction.",
     biography: existing?.biography ?? entity.notes ?? "",
-    traits: existing?.traits ?? [],
+    traits: Array.isArray(existing?.traits) ? existing.traits : [],
     source: existing?.source ?? "generated",
-    username: existing?.username ?? `@${slug(entity.label)}`,
-    role: existing?.role ?? inferRole(entity),
-    status: existing?.status ?? "unknown",
-    lastSeen: existing?.lastSeen ?? "No activity recorded",
-    experience: existing?.experience ?? inferExperience(entity),
-    walletMinor: Math.max(0, existing?.walletMinor ?? 0),
+    username: existing?.username?.trim() || `@${slug(entity.label)}`,
+    role: existing?.role?.trim() || inferRole(entity),
+    status: validStatus(existing?.status),
+    lastSeen: existing?.lastSeen?.trim() || "No activity recorded",
+    experience: Array.isArray(existing?.experience) ? existing.experience : inferExperience(entity),
+    walletMinor,
     maximumRecordedWalletMinor: Math.max(
-      existing?.maximumRecordedWalletMinor ?? 0,
-      existing?.walletMinor ?? 0,
+      finiteNumber(existing?.maximumRecordedWalletMinor),
+      walletMinor,
     ),
-    accent: existing?.accent ?? factionAccent(entity.faction),
+    accent: isAccent(existing?.accent) ? existing!.accent : factionAccent(entity.faction),
     ...(existing?.avatarAssetId ? { avatarAssetId: existing.avatarAssetId } : {}),
     ...(existing?.avatarUrl ? { avatarUrl: existing.avatarUrl } : {}),
   };
@@ -100,6 +107,20 @@ function factionAccent(faction: BoardEntity["faction"]): string {
   if (faction === "police") return "#4f8cff";
   if (faction === "criminal") return "#ff5c6c";
   return "#f4b860";
+}
+
+function validStatus(value: PersonPresenceStatus | undefined): PersonPresenceStatus {
+  return value === "online" || value === "busy" || value === "offline" || value === "unknown"
+    ? value
+    : "unknown";
+}
+
+function isAccent(value: string | undefined): value is string {
+  return Boolean(value && /^#[0-9a-f]{6}$/i.test(value));
+}
+
+function finiteNumber(value: number | undefined): number {
+  return Number.isFinite(value) ? value! : 0;
 }
 
 function slug(value: string): string {
