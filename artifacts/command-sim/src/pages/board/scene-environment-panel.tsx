@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   CloudFog,
   CloudRain,
@@ -5,6 +6,7 @@ import {
   Snowflake,
   SunMedium,
   ThermometerSun,
+  type LucideIcon,
 } from "lucide-react";
 import {
   getBoardEnvironment,
@@ -102,15 +104,15 @@ export function SceneEnvironmentPanel() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <div className="grid gap-1"><Label className="text-[10px]">{label}</Label>{children}</div>;
 }
 
-function EnvironmentStat({ icon: Icon, label, value }: { icon: typeof Map; label: string; value: string }) {
+function EnvironmentStat({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return <div className="rounded-lg border bg-background/55 p-2 shadow-inner"><Icon className="mb-1 h-3.5 w-3.5 text-primary" /><div className="text-muted-foreground">{label}</div><strong className="block truncate text-foreground">{value}</strong></div>;
 }
 
-function weatherIcon(weather: SceneWeather): typeof Map {
+function weatherIcon(weather: SceneWeather): LucideIcon {
   if (weather === "rain") return CloudRain;
   if (weather === "fog" || weather === "cloudy") return CloudFog;
   if (weather === "snow") return Snowflake;
