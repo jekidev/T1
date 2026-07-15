@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "assetRoot": "RAG/Graphics/pictures",
+  "renderPolicy": {
+    "preserveOriginalPixels": true,
+    "applyTransparencyAtRuntime": true,
+    "defaultTheme": "dark",
+    "fallbackOpacity": 0.12,
+    "doNotBakeOpacityIntoSource": true
+  },
+  "assets": [
+    {
+      "id": "copenhagen-night-street",
+      "file": "copenhagen-night-street.jpg",
+      "sourceUpload": "1806.jpg",
+      "role": ["background", "widget-texture", "bar-texture", "gui-material"],
+      "opacity": {
+        "default": 0.18,
+        "widget": 0.10,
+        "bar": 0.08,
+        "panel": 0.14,
+        "fullBackground": 0.24
+      },
+      "blendMode": "soft-light",
+      "position": "center",
+      "fit": "cover"
+    },
+    {
+      "id": "nightlife-crowd-motion",
+      "file": "nightlife-crowd-motion.jpg",
+      "sourceUpload": "1733.jpg",
+      "role": ["crowd-texture", "motion-layer", "widget-texture", "gui-material"],
+      "opacity": {
+        "default": 0.14,
+        "widget": 0.08,
+        "bar": 0.06,
+        "panel": 0.11,
+        "fullBackground": 0.18
+      },
+      "blendMode": "luminosity",
+      "position": "center",
+      "fit": "cover"
+    },
+    {
+      "id": "hurtig-levering-hud-poster",
+      "file": "hurtig-levering-hud-poster.jpg",
+      "sourceUpload": "1708.png",
+      "role": ["hud-reference", "interface-texture", "graphic-material"],
+      "opacity": {
+        "default": 0.10,
+        "widget": 0.06,
+        "bar": 0.05,
+        "panel": 0.08,
+        "fullBackground": 0.12
+      },
+      "blendMode": "screen",
+      "position": "center",
+      "fit": "cover",
+      "notes": "The uploaded .png contained JPEG data, so the repository file uses the correct .jpg extension."
+    },
+    {
+      "id": "kbx-monogram-logo",
+      "file": "kbx-monogram-logo.jpg",
+      "sourceUpload": "1729.jpg",
+      "role": ["logo", "watermark", "widget-mark", "bar-mark"],
+      "opacity": {
+        "default": 0.22,
+        "widget": 0.16,
+        "bar": 0.12,
+        "panel": 0.18,
+        "fullBackground": 0.10
+      },
+      "blendMode": "screen",
+      "position": "center",
+      "fit": "contain"
+    }
+  ]
+}
