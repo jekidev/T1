@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 import {
   createNetworkSession,
@@ -132,7 +132,7 @@ function headerValue(req: Request, name: string): string | undefined {
   return Array.isArray(header) ? header[0] : header;
 }
 
-function respondError(res: Parameters<IRouter["use"]>[0] extends never ? never : any, error: unknown, fallbackStatus = 400): void {
+function respondError(res: Response, error: unknown, fallbackStatus = 400): void {
   const status = error instanceof HttpRouteError ? error.status : fallbackStatus;
   res.status(status).json({ error: error instanceof Error ? error.message : String(error) });
 }
