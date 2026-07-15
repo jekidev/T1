@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "topics": [
+    "architecture",
+    "rag",
+    "game-design",
+    "blue-team",
+    "psychology",
+    "code",
+    "roadmap",
+    "prompt-experiment",
+    "external-link",
+    "sensitive-invite-link",
+    "uncategorized"
+  ],
+  "risk_tiers": {
+    "safe": "General architecture, product design, or non-sensitive notes.",
+    "defensive": "Detection, compliance, investigation, mitigation, or safety content.",
+    "restricted_defensive": "Mixed defensive and operational detail; controlled review only.",
+    "restricted": "Operationally harmful, illegal, sensitive, or abuse-enabling content.",
+    "prompt_injection": "Text attempting to override model/system instructions or disable safeguards."
+  }
+}
