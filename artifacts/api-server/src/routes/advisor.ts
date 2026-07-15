@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { SendAdvisorMessageBody } from "@workspace/api-zod";
 import { chatWithOpenRouter, type ChatMessage } from "../lib/openrouter";
+import { chatWithWorkspaceOpenRouter } from "../lib/workspace-openrouter";
+import { findWorkspaceSession } from "../lib/workspace-session";
 import { listObservabilityEvents } from "../lib/observability";
 import { getPersistentRagContext } from "../lib/rag-memory";
 
@@ -57,8 +59,16 @@ router.post("/advisor/chat", async (req, res): Promise<void> => {
     ...((body.history ?? []).map(h => ({ role: h.role, content: h.content }) as ChatMessage)),
     { role: "user", content: body.message },
   ];
-  try { const reply = await chatWithOpenRouter(messages); res.json({ reply, mode: "external_llm" }); }
-  catch (err) { req.log.error({ err }, "Advisor chat failed; using local fallback"); res.json({ reply: localFallback(body.board as Record<string, unknown>, body.message), mode: "local_fallback" }); }
+  try {
+    const session = findWorkspaceSession(req);
+    const reply = session?.tests.openRouter && session.openRouterApiKey
+      ? await chatWithWorkspaceOpenRouter(messages, session.openRouterApiKey)
+      : await chatWithOpenRouter(messages);
+    res.json({ reply, mode: session?.tests.openRouter ? "workspace_openrouter" : "server_openrouter" });
+  } catch (err) {
+    req.log.error({ err }, "Advisor chat failed; using local fallback");
+    res.json({ reply: localFallback(body.board as Record<string, unknown>, body.message), mode: "local_fallback" });
+  }
 });
 
 export default router;
