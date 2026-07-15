@@ -148,6 +148,7 @@ export function applyAdvisorBuildProposal(board: BoardState, proposal: AdvisorBu
       ...entity,
       label: playerProfile.name?.trim() ? playerProfile.name.trim().slice(0, 160) : entity.label,
       profile: {
+        ...entity.profile,
         personality: playerProfile.personality?.trim().slice(0, 2000) || entity.profile?.personality || "",
         biography: playerProfile.biography?.trim().slice(0, 4000) || entity.profile?.biography || "",
         traits: playerProfile.traits?.filter(Boolean).slice(0, 30) ?? entity.profile?.traits ?? [],
