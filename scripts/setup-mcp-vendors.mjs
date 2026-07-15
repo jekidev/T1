@@ -1,5 +1,5 @@
 import { mkdir, access } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 const root = process.cwd();
@@ -19,6 +19,13 @@ const vendors = [
     branch: 'master',
     required: true,
   },
+  {
+    name: 'telegram-api',
+    repository: 'https://github.com/Anon4You/Telegram-Api.git',
+    branch: 'main',
+    required: false,
+    pipSync: true,
+  },
 ];
 
 function run(command, args, cwd = root) {
@@ -36,6 +43,31 @@ async function tryUvSync(target, required) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Failed to sync ${path.relative(root, target)}:`, message);
+    if (required) process.exitCode = 1;
+  }
+}
+
+function findPython() {
+  for (const command of ['python3', 'python']) {
+    const result = spawnSync(command, ['--version'], { stdio: 'ignore', shell: process.platform === 'win32' });
+    if (result.status === 0) return command;
+  }
+  return null;
+}
+
+async function tryPipSync(target, required) {
+  const python = findPython();
+  if (!python) {
+    console.warn(`Python not found; skipping pip sync for ${path.relative(root, target)}.`);
+    if (required) process.exitCode = 1;
+    return;
+  }
+  try {
+    console.log(`Installing Python dependencies for ${path.relative(root, target)}...`);
+    await run(python, ['-m', 'pip', 'install', '-r', 'requirements.txt'], target);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to install Python dependencies for ${path.relative(root, target)}:`, message);
     if (required) process.exitCode = 1;
   }
 }
@@ -59,6 +91,9 @@ for (const vendor of vendors) {
     }
     if (vendor.uvSync) {
       await tryUvSync(target, vendor.required);
+    }
+    if (vendor.pipSync) {
+      await tryPipSync(target, vendor.required);
     }
   } catch (error) {
     console.error(`Failed to install ${vendor.name}:`, error instanceof Error ? error.message : error);

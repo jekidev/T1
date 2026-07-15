@@ -6,6 +6,7 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "setup": "node scripts/setup.mjs",
     "setup:mcp": "node scripts/setup-mcp-vendors.mjs",
+    "mcp:fetch-telegram-api": "node scripts/fetch-telegram-api.mjs",
     "deployment:start": "node deployment/bootstrap.mjs",
     "deployment:replit": "node deployment/replit.mjs",
     "deployment:manus": "node deployment/manus.mjs",
