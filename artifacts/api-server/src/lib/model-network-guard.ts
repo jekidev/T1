@@ -16,7 +16,8 @@ export function installModelNetworkGuard(): void {
   const originalFetch = globalThis.fetch.bind(globalThis);
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = input instanceof Request ? input : undefined;
-    const url = new URL(request?.url ?? (input instanceof URL ? input.toString() : input));
+    const rawUrl = request ? request.url : input instanceof URL ? input.toString() : String(input);
+    const url = new URL(rawUrl);
     const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
 
     if (method === "POST" && /\/chat\/completions\/?$/i.test(url.pathname)) {
