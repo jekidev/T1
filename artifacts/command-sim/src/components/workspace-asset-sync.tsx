@@ -30,7 +30,7 @@ export function WorkspaceAssetSync() {
       if (busy || cancelled) return;
       busy = true;
       try {
-        const statusResponse = await fetch("/api/workspace/status", { credentials: "include" });
+        const statusResponse = await fetch("/api/workspace/auth/status", { credentials: "include" });
         if (!statusResponse.ok) return;
         const status = await statusResponse.json() as WorkspaceStatus;
         if (!status.ready) return;
