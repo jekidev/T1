@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   WORKSPACE_UPDATED_EVENT,
   loadWorkspaceState,
+  saveWorkspaceState,
   type UserWorkspaceState,
   type WorkspaceAsset,
 } from "@/lib/workspace";
@@ -84,12 +85,26 @@ export function PersonProfileEditor({ entity, onUpdate }: PersonProfileEditorPro
         headers: { "Content-Type": file.type, "X-File-Name": file.name },
         body: file,
       });
-      const body = await response.json() as { source?: { id: string }; error?: string };
+      const body = await response.json() as { source?: { id: string; mimeType?: string }; error?: string };
       if (!response.ok || !body.source) throw new Error(body.error ?? "Profile image upload failed.");
-      updateProfile({
-        avatarAssetId: body.source.id,
-        avatarUrl: `/api/asset-generation/sources/${encodeURIComponent(body.source.id)}`,
+      const sourceUrl = `/api/asset-generation/sources/${encodeURIComponent(body.source.id)}`;
+      const asset: WorkspaceAsset = {
+        id: crypto.randomUUID(),
+        name: file.name.slice(0, 300),
+        mimeType: body.source.mimeType ?? file.type,
+        sourceId: body.source.id,
+        sourceUrl,
+        origin: "upload",
+        createdAt: new Date().toISOString(),
+      };
+      const workspace = loadWorkspaceState();
+      saveWorkspaceState({
+        ...workspace,
+        assets: [asset, ...workspace.assets.filter(item => item.sourceId !== asset.sourceId)],
       });
+      setLibraryAssets(current => [asset, ...current.filter(item => item.sourceId !== asset.sourceId)]);
+      setSelectedLibraryAssetId(asset.id);
+      updateProfile({ avatarAssetId: asset.sourceId, avatarUrl: sourceUrl });
     } finally {
       setUploading(false);
     }
