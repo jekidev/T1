@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import type { BoardState, FactionState, SimulationState, TimelineEvent } from "./types";
+import { selectNarrativeEvents } from "./narrativeEngine";
 
 export interface PlayerTurnAction {
   type: "invest" | "gather_intelligence" | "reduce_pressure" | "expand_influence" | "train" | "wait";
@@ -95,7 +96,7 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
 
   const summary = `Turn ${next.turn}: city tension ${next.cityTension}, evidence ${next.evidenceQuality}, public confidence ${next.publicConfidence}, media pressure ${next.mediaPressure}.`;
   next.lastResolution = summary;
-  const event: TimelineEvent = {
+  const resolutionEvent: TimelineEvent = {
     id: nanoid(10),
     phaseId: board.currentPhaseId,
     label: `Turn ${next.turn} resolved`,
@@ -105,14 +106,23 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
     sourceStatus: "balance",
   };
 
+  const nextBoard: BoardState = {
+    ...board,
+    simulation: next,
+    timelineEvents: [...board.timelineEvents, resolutionEvent],
+    moveHistory: [...board.moveHistory, { id: nanoid(10), summary: action ? `Player action: ${action.type}` : "No player action", actorFaction: null, createdAt: new Date().toISOString() }],
+  };
+
+  const narrativeEvents = selectNarrativeEvents(nextBoard);
+  nextBoard.timelineEvents = [...nextBoard.timelineEvents, ...narrativeEvents];
+
+  const eventSummary = narrativeEvents.length > 0
+    ? `${summary} ${narrativeEvents.map((e) => e.label).join("; ")}.`
+    : summary;
+
   return {
-    board: {
-      ...board,
-      simulation: next,
-      timelineEvents: [...board.timelineEvents, event],
-      moveHistory: [...board.moveHistory, { id: nanoid(10), summary: action ? `Player action: ${action.type}` : "No player action", actorFaction: null, createdAt: new Date().toISOString() }],
-    },
-    summary,
-    events: [event],
+    board: nextBoard,
+    summary: eventSummary,
+    events: [resolutionEvent, ...narrativeEvents],
   };
 }
