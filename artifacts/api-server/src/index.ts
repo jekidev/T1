@@ -1,4 +1,5 @@
 import { logger } from "./lib/logger";
+import { startHeadsUpScheduler } from "./lib/llm-heads-up";
 import { installModelNetworkGuard } from "./lib/model-network-guard";
 import { initializeTelemetry, shutdownTelemetry } from "./lib/telemetry";
 import { syncRagIntoPersistentMemory } from "./lib/rag-memory";
@@ -21,8 +22,11 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-void syncRagIntoPersistentMemory().catch((error) => {
+void syncRagIntoPersistentMemory().then(() => {
+  startHeadsUpScheduler();
+}).catch((error) => {
   logger.error({ error }, "RAG startup sync failed");
+  startHeadsUpScheduler();
 });
 
 const server = app.listen(port, (err) => {

@@ -18,6 +18,7 @@ import pathPlanningRouter from "./path-planning";
 import evolveRouter from "./evolve";
 import ragRouter from "./rag";
 import sourceDebugRouter from "./source-debug";
+import llmHeadsUpRouter from "./llm-heads-up";
 
 const router: IRouter = Router();
 
@@ -39,6 +40,7 @@ router.use(pathPlanningRouter);
 router.use(evolveRouter);
 router.use(ragRouter);
 router.use(sourceDebugRouter);
+router.use(llmHeadsUpRouter);
 router.use(advisorRouter);
 
 export default router;

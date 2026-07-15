@@ -1,13 +1,15 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { extractDocumentText, wisdomDocumentExtensions } from "./document-text";
 import { recordObservabilityEvent } from "./observability";
+import { projectRoot } from "./project-root";
 
-const root = process.cwd();
+const root = projectRoot;
 const ragRoot = path.resolve(root, "rag");
 const runtimeDir = path.resolve(root, ".runtime");
 const memoryFile = path.join(runtimeDir, "rag-persistent-memory.json");
-const textExtensions = new Set([".md", ".txt", ".json", ".jsonl", ".csv", ".ts", ".tsx", ".js", ".mjs", ".yaml", ".yml"]);
+const textExtensions = new Set([".md", ".txt", ".text", ".json", ".jsonl", ".csv", ".ts", ".tsx", ".js", ".mjs", ".yaml", ".yml"]);
 const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 
 export interface RagMemoryItem {
@@ -19,6 +21,8 @@ export interface RagMemoryItem {
   content: string;
   integratedAt: string;
   sizeBytes: number;
+  extraction?: "direct" | "python" | "companion" | "unavailable";
+  warning?: string;
 }
 
 export interface RagSyncResult {
@@ -66,6 +70,10 @@ function titleFromPath(file: string): string {
   return path.basename(file).replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
 }
 
+function normalizedPrefix(value: string): string {
+  return value.replaceAll("\\", "/").replace(/^\/+|\/+$/g, "").toLowerCase();
+}
+
 export async function syncRagIntoPersistentMemory(options: { rebuild?: boolean } = {}): Promise<RagSyncResult> {
   await fs.mkdir(ragRoot, { recursive: true });
   const previous = await loadMemory();
@@ -102,18 +110,28 @@ export async function syncRagIntoPersistentMemory(options: { rebuild?: boolean }
     }
 
     let kind: RagMemoryItem["kind"] = "document";
-    let content = `Document stored at ${relative}. Binary extraction is not available for this file type yet.`;
+    let content = `Document stored at ${relative}. Text extraction was not available.`;
+    let extraction: RagMemoryItem["extraction"] = "unavailable";
+    let warning: string | undefined;
+
     if (textExtensions.has(extension)) {
       kind = "text";
       content = bytes.toString("utf8").slice(0, 120_000);
+      extraction = "direct";
     } else if (imageExtensions.has(extension)) {
       kind = "image";
       const companion = `${file}.md`;
       try {
         content = (await fs.readFile(companion, "utf8")).slice(0, 40_000);
+        extraction = "companion";
       } catch {
         content = `Image note stored at ${relative}. No text description has been added yet.`;
       }
+    } else if (wisdomDocumentExtensions.has(extension)) {
+      const extracted = await extractDocumentText(file, 120_000);
+      content = extracted.content || content;
+      extraction = extracted.extraction;
+      warning = extracted.warning;
     }
 
     next.push({
@@ -125,6 +143,8 @@ export async function syncRagIntoPersistentMemory(options: { rebuild?: boolean }
       content,
       integratedAt: new Date().toISOString(),
       sizeBytes: stat.size,
+      extraction,
+      ...(warning ? { warning } : {}),
     });
     if (previousItem) updated += 1;
     else added += 1;
@@ -157,8 +177,17 @@ export async function listRagMemory(): Promise<RagMemoryItem[]> {
   return loadMemory();
 }
 
-export async function getPersistentRagContext(maxCharacters = 24_000): Promise<string> {
+export async function listRagMemoryByPrefix(prefix: string): Promise<RagMemoryItem[]> {
+  const expected = normalizedPrefix(prefix);
   const items = await loadMemory();
+  return items.filter(item => {
+    const source = normalizedPrefix(item.sourcePath);
+    return source === expected || source.startsWith(`${expected}/`) || source.startsWith(`rag/${expected}/`);
+  });
+}
+
+export async function getPersistentRagContext(maxCharacters = 24_000, sourcePrefix?: string): Promise<string> {
+  const items = sourcePrefix ? await listRagMemoryByPrefix(sourcePrefix) : await loadMemory();
   const selected: string[] = [];
   let length = 0;
   for (const item of [...items].reverse()) {

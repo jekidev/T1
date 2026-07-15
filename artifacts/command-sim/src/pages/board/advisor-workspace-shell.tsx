@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { AdvisorPanel as LegacyAdvisorPanel } from "./advisor-panel";
 import { FamilyTreePanel } from "./family-tree-panel";
+import { HeadsUpDock } from "./heads-up-dock";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -134,6 +135,7 @@ export function AdvisorWorkspaceShell() {
         </div>
       </div>
       <div className="min-h-0 flex-1"><LegacyAdvisorPanel /></div>
+      <HeadsUpDock board={board as unknown as Record<string, unknown>} />
       <FamilyTreePanel open={familyOpen} board={board} onClose={() => setFamilyOpen(false)} onChange={next => loadBoard(next, scenarioId, scenarioName, scenarioDescription)} />
     </div>
   );

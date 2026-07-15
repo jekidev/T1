@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-07-15T00:55:57.439778+00:00",
+  "repository": "jekidev/T1",
+  "document_count": 17,
+  "chunk_count": 1250,
+  "safe_chunk_count": 784,
+  "quarantine_chunk_count": 466,
+  "documents": [
+    {"name":"Dr Nyx bekræfter akademisk sandbox - DeepSeek(1).pdf","sha256":"8a4f8a4359b4797d01e4302a99164482906fc1f18c037e5109047fb8197d50ba","pages":35,"chunks":62},
+    {"name":"Dr Nyx bekræfter akademisk sandbox - DeepSeek.pdf","sha256":"94eb8ab6fdd4763b0183cea2fd269d67499fc1e5696f06ebc3aa04eb201bf0cd","pages":29,"chunks":51},
+    {"name":"HackerAI - AI-Powered Penetration Testing Assistant(10).pdf","sha256":"202f35427c1d3098759e3c7b2ccf6a359f42239c1dd7fe3670bf622fc3a15fb0","pages":1,"chunks":1},
+    {"name":"HackerAI - AI-Powered Penetration Testing Assistant(8).pdf","sha256":"95ac1d895f6612b6580b94b951f69eedd209ecfb1de6d089d0a3a80615876787","pages":1,"chunks":1},
+    {"name":"HackerAI - AI-Powered Penetration Testing Assistant(9).pdf","sha256":"da4b1e7b60300012e44b4b8f379ed25507e07cb84806badd8c4c8fae1733b5da","pages":1,"chunks":1},
+    {"name":"message(4)","sha256":"f93a49302ee9454ca9521cc7a38e3a282f44153c0043d90a4f219edfac945508","pages":3,"chunks":3},
+    {"name":"message(4).pdf","sha256":"f93a49302ee9454ca9521cc7a38e3a282f44153c0043d90a4f219edfac945508","pages":3,"chunks":3},
+    {"name":"message(5)","sha256":"1ae193ba52da4f19a06b97145ef77f86526866cb753878bb5a4d3e2521a800c5","pages":3,"chunks":3},
+    {"name":"message(6)","sha256":"0ef9764bd974d3172f060a19bdd8ebb6da808c2a47dcf17ac27eaf4c14c2601e","pages":6,"chunks":11},
+    {"name":"message(6).pdf","sha256":"0ef9764bd974d3172f060a19bdd8ebb6da808c2a47dcf17ac27eaf4c14c2601e","pages":6,"chunks":11},
+    {"name":"Nyx game development - DeepSeek(1).pdf","sha256":"1e4b8a1f651f57d98fe1d6867a491ef87ccd1657103a4dd6ff27c8cc93b60458","pages":201,"chunks":280},
+    {"name":"Nyx game development - DeepSeek(2).pdf","sha256":"9a1070676e214ed4fdd6dcaeb60fee379f09ed8bba54ff5b7ee4b684ac39fd61","pages":264,"chunks":365},
+    {"name":"Nyx game development - DeepSeek.pdf","sha256":"485a709104692d498168d436fe6f62ef4cd3db5af9e2abd689c6e5ced74d4b38","pages":49,"chunks":61},
+    {"name":"Nyx Ready - DeepSeek(1).pdf","sha256":"faa67b19df5d37a31b2781aade7f74c932e7813222ff2bba82c0197611af04b8","pages":123,"chunks":139},
+    {"name":"Nyx Ready - DeepSeek.pdf","sha256":"eb161cb8089d92437baca1f745f375907dea3eb0e850021373dcdcdf6f3217b2","pages":71,"chunks":86},
+    {"name":"Nyx Response - DeepSeek.pdf","sha256":"1cc1a89ed2d10cc467dd8c73d87263b1a12a6b2a89a6f748fac87e64f64a3259","pages":151,"chunks":165},
+    {"name":"Unavngivet dokument","sha256":"71cd31f5c371886bf4d14663109a77ec5a5ef75ac75678734ce92157f05ee56a","pages":4,"chunks":7}
+  ]
+}

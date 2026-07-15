@@ -45,15 +45,32 @@ if (!(await exists(envFile))) {
 
 await mkdir(path.join(root, 'rag/inbox'), { recursive: true });
 await mkdir(path.join(root, 'rag/google-drive'), { recursive: true });
+await mkdir(path.join(root, 'rag/wisdom/common/everyday tips'), { recursive: true });
+await mkdir(path.join(root, 'rag/Code/LLM_scripts'), { recursive: true });
 
 console.log('Installing dependencies...');
 run('pnpm', ['install', '--frozen-lockfile']);
+
+const python = ['python3', 'python'].find(command => spawnSync(command, ['--version'], { stdio: 'ignore', shell: process.platform === 'win32' }).status === 0);
+if (python) {
+  console.log(`Installing knowledge extraction support with ${python}...`);
+  const result = spawnSync(python, ['-m', 'pip', 'install', '-r', 'requirements-knowledge.txt'], {
+    cwd: root,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+  if (result.status !== 0) console.warn('Python knowledge dependencies were not installed. TXT/MD/DOCX still work; run pip install -r requirements-knowledge.txt for PDF extraction.');
+} else {
+  console.warn('Python was not found. Install Python and run pip install -r requirements-knowledge.txt for PDF extraction.');
+}
 
 console.log('\nBase installation completed.');
 console.log('\nGoogle Drive connection:');
 console.log('- Replit: open Tools/Connections, connect Google Drive, and let Replit Agent wire the connection into this project.');
 console.log('- Manus: connect Google Drive in Manus, then instruct it to use that connection as the only RAG source.');
 console.log('- Local/Termux: download or sync Drive files into rag/google-drive, then run pnpm rag:sync.');
+console.log('\nHourly wisdom: add PDF, DOCX, DOC, TXT, TEXT or MD files to rag/wisdom/common/everyday tips.');
+console.log('Uber mode proposals are written to rag/Code/LLM_scripts/<model>/ as review-only Markdown.');
 console.log('\nCredentials and OAuth tokens must remain in the platform connection/secret store and must never be committed to GitHub.');
 console.log('\nNext commands:');
 console.log('  pnpm rag:sync');
