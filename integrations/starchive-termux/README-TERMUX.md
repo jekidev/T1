@@ -44,7 +44,9 @@ https://api.githubcopilot.com/mcp/
 To use another compatible GitHub MCP endpoint:
 
 ```bash
-GITHUB_MCP_URL="https://your-mcp-host.example/mcp/" ./run.sh
+GITHUB_MCP_URL="https://your-mcp-host.example/mcp/" \
+STARCHIVE_ALLOW_CUSTOM_MCP=1 \
+./run.sh
 ```
 
 ## Use another GitHub account
@@ -60,6 +62,41 @@ through the GitHub CLI.
 When the MCP server exposes `list_starred_repositories`, it is used
 automatically. Otherwise the script prints a notice and uses the REST
 fallback.
+
+## Incremental exports and filters
+
+Export only repositories starred since a timestamp:
+
+```bash
+STARCHIVE_SINCE="2026-07-01T00:00:00Z" ./run.sh
+```
+
+Let the exporter remember the newest starred timestamp between runs:
+
+```bash
+STARCHIVE_INCREMENTAL=1 ./run.sh
+```
+
+Optional chat-friendly filters are available through environment variables:
+
+```bash
+STARCHIVE_INCREMENTAL=1 \
+STARCHIVE_LANGUAGE=Python \
+STARCHIVE_TOPIC=machine-learning \
+STARCHIVE_MIN_STARS=100 \
+./run.sh
+```
+
+The exporter validates required CSV fields, HTTPS repository URLs, and
+non-negative integer star counts before writing the file.
+
+Custom MCP endpoints require explicit approval:
+
+```bash
+GITHUB_MCP_URL="https://your-mcp-host.example/mcp/" \
+STARCHIVE_ALLOW_CUSTOM_MCP=1 \
+./run.sh
+```
 
 If you authenticate the wrong GitHub account:
 

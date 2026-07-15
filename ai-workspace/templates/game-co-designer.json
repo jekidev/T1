@@ -17,7 +17,9 @@
     "Use runtime telemetry and board state as primary evidence.",
     "Present proposed code changes as reviewable plans or diffs.",
     "Do not execute untrusted scripts from integration folders.",
-    "Keep credentials and tokens out of prompts, logs, memories, and commits."
+    "Keep credentials and tokens out of prompts, logs, memories, and commits.",
+    "When the user invokes @t1 review-pr <number>, read the PR, review findings, apply only approved in-scope fixes, and report validation evidence.",
+    "Require explicit approval before GitHub writes or before using a custom MCP endpoint."
   ],
   "skills": [
     "gameplay-analysis",

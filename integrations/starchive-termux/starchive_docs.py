@@ -15,8 +15,10 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlparse
 
 import requests
 
@@ -24,6 +26,15 @@ MCP_URL = "https://api.githubcopilot.com/mcp/"
 MCP_PROTOCOL_VERSION = "2025-06-18"
 GITHUB_API_URL = "https://api.github.com"
 USER_AGENT = "STARCHIVE-Termux/2.0"
+CSV_FIELDS = [
+    "repo_full_name",
+    "repo_url",
+    "description",
+    "language",
+    "stars",
+    "updated_at",
+    "starred_at",
+]
 
 
 def token_from_environment_or_gh() -> str | None:
@@ -65,6 +76,7 @@ def api_session_for(token: str | None) -> requests.Session:
     session.headers.update(
         {
             "Accept": "application/vnd.github+json",
+            "Accept": "application/vnd.github.star+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": USER_AGENT,
         }
@@ -201,11 +213,52 @@ def fetch_all_starred_via_api(
     return repositories
 
 
-def export_csv(
-    destination: Path,
+def parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def repository_starred_at(repository: dict[str, Any]) -> str:
+    return str(repository.get("starredAt") or repository.get("starred_at") or "")
+
+
+def filter_repositories(
     repositories: list[dict[str, Any]],
-) -> int:
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    since: str | None,
+    language: str | None,
+    topic: str | None,
+    minimum_stars: int | None,
+) -> list[dict[str, Any]]:
+    since_timestamp = parse_timestamp(since)
+    normalized_language = language.casefold() if language else None
+    normalized_topic = topic.casefold() if topic else None
+    filtered = []
+    for repository in repositories:
+        starred_at = repository_starred_at(repository)
+        if since_timestamp and (
+            not starred_at or parse_timestamp(starred_at) <= since_timestamp
+        ):
+            continue
+        if normalized_language and str(repository.get("language") or "").casefold() != normalized_language:
+            continue
+        topics = repository.get("topics") or repository.get("topicNames") or []
+        if normalized_topic and normalized_topic not in {
+            str(item).casefold() for item in topics
+        }:
+            continue
+        stars = repository.get("stargazerCount", repository.get("stargazers_count", 0))
+        if minimum_stars is not None and int(stars or 0) < minimum_stars:
+            continue
+        filtered.append(repository)
+    return filtered
+
+
+def rows_for_repositories(repositories: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = [
         {
             "repo_full_name": repo.get("fullName") or repo.get("full_name", ""),
@@ -218,18 +271,60 @@ def export_csv(
         }
         for repo in repositories
     ]
+    for row in rows:
+        if not row["repo_full_name"]:
+            raise ValueError("CSV validation failed: repo_full_name is required")
+        parsed_url = urlparse(str(row["repo_url"]))
+        if parsed_url.scheme != "https" or not parsed_url.netloc:
+            raise ValueError(
+                f"CSV validation failed: invalid repo_url for {row['repo_full_name']}"
+            )
+        try:
+            stars = int(row["stars"] or 0)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"CSV validation failed: stars is not an integer for {row['repo_full_name']}"
+            ) from exc
+        if stars < 0:
+            raise ValueError(
+                f"CSV validation failed: stars is negative for {row['repo_full_name']}"
+            )
+        row["stars"] = stars
+    return rows
+
+
+def load_last_export(state_file: Path) -> str | None:
+    if not state_file.exists():
+        return None
+    with state_file.open(encoding="utf-8") as handle:
+        state = json.load(handle)
+    return state.get("last_export_at")
+
+
+def save_last_export(state_file: Path, repositories: list[dict[str, Any]]) -> None:
+    timestamps = [
+        parse_timestamp(repository_starred_at(repository))
+        for repository in repositories
+        if repository_starred_at(repository)
+    ]
+    latest = max((timestamp for timestamp in timestamps if timestamp), default=None)
+    if latest is None:
+        return
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    with state_file.open("w", encoding="utf-8") as handle:
+        json.dump({"last_export_at": latest.isoformat()}, handle)
+
+
+def export_csv(
+    destination: Path,
+    repositories: list[dict[str, Any]],
+) -> int:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    rows = rows_for_repositories(repositories)
     with destination.open("w", newline="", encoding="utf-8-sig") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=[
-                "repo_full_name",
-                "repo_url",
-                "description",
-                "language",
-                "stars",
-                "updated_at",
-                "starred_at",
-            ],
+            fieldnames=CSV_FIELDS,
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -246,20 +341,56 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output", default="output/starred_repos.csv", help="CSV output path"
     )
+    parser.add_argument("--since", help="Only include repositories starred after this ISO timestamp")
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Use and update the last-export timestamp state file",
+    )
+    parser.add_argument(
+        "--state-file",
+        default=".starchive/last-export.json",
+        help="Incremental export state path",
+    )
+    parser.add_argument("--language", help="Filter by exact programming language")
+    parser.add_argument("--topic", help="Filter by an exact repository topic")
+    parser.add_argument("--min-stars", type=int, help="Filter by minimum star count")
+    parser.add_argument(
+        "--allow-custom-mcp",
+        action="store_true",
+        help="Approve use of a non-default GITHUB_MCP_URL",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     token = token_from_environment_or_gh()
+    mcp_url = os.environ.get("GITHUB_MCP_URL", MCP_URL)
+    if mcp_url != MCP_URL and not args.allow_custom_mcp:
+        print(
+            "Custom GitHub MCP endpoint requires explicit approval. "
+            "Re-run with --allow-custom-mcp.",
+            file=sys.stderr,
+        )
+        return 7
     session = session_for(token)
     try:
+        since = args.since
+        state_file = Path(args.state_file)
+        if args.incremental and not since:
+            since = load_last_export(state_file)
         try:
             starred = fetch_all_starred(session, args.username)
         except LookupError as exc:
             print(f"Notice: {exc}; using GitHub REST fallback.", file=sys.stderr)
             starred = fetch_all_starred_via_api(api_session_for(token), args.username)
-        count = export_csv(Path(args.output), starred)
+        selected = filter_repositories(
+            starred, since, args.language, args.topic, args.min_stars
+        )
+        count = export_csv(Path(args.output), selected)
+        if args.incremental:
+            save_last_export(state_file, starred)
         print(f"Exported {count} starred repositories to {args.output}")
         return 0
     except requests.HTTPError as exc:

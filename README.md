@@ -146,6 +146,9 @@ pnpm dev
 
 See `DEPLOYMENT.md` for the detailed flow.
 
+Chat workflow commands are documented in [`docs/chat-commands.md`](docs/chat-commands.md),
+including `@t1 export-stars` filters and `@t1 review-pr <number>`.
+
 ## GitHub starred repositories
 
 The Termux exporter in `integrations/starchive-termux` writes the authenticated
@@ -163,5 +166,6 @@ cd integrations/starchive-termux
 ```
 
 The CSV is saved to Android's Downloads folder as
-`starred_repos.csv`. Set `GITHUB_USERNAME` to export another public account,
-or set `GITHUB_MCP_URL` to use another compatible MCP endpoint.
+`starred_repos.csv`. Set `GITHUB_USERNAME` to export another public account.
+Custom `GITHUB_MCP_URL` values require the explicit
+`STARCHIVE_ALLOW_CUSTOM_MCP=1` approval flag.

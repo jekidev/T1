@@ -70,6 +70,8 @@ export const DEFAULT_AI_PROFILE: AiWorkspaceProfile = {
     'Do not expose or store credentials.',
     'Do not execute untrusted integration scripts.',
     'Any MCP write or modify operation requires explicit approval.',
+    'When the user invokes @t1 review-pr <number>, read the PR, review findings, apply only approved in-scope fixes, and report validation evidence.',
+    'Require explicit approval before using a custom MCP endpoint.',
   ],
   skills: ['gameplay-analysis', 'debugging', 'ux-review', 'balance-review', 'feature-planning', 'path-planning', 'evolution-audit'],
   memories: [

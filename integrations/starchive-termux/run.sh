@@ -24,6 +24,24 @@ ARGS=(--output "$OUTPUT")
 if [ -n "${GITHUB_USERNAME:-}" ]; then
     ARGS+=(--username "$GITHUB_USERNAME")
 fi
+if [ "${STARCHIVE_INCREMENTAL:-0}" = "1" ]; then
+    ARGS+=(--incremental)
+fi
+if [ -n "${STARCHIVE_SINCE:-}" ]; then
+    ARGS+=(--since "$STARCHIVE_SINCE")
+fi
+if [ -n "${STARCHIVE_LANGUAGE:-}" ]; then
+    ARGS+=(--language "$STARCHIVE_LANGUAGE")
+fi
+if [ -n "${STARCHIVE_TOPIC:-}" ]; then
+    ARGS+=(--topic "$STARCHIVE_TOPIC")
+fi
+if [ -n "${STARCHIVE_MIN_STARS:-}" ]; then
+    ARGS+=(--min-stars "$STARCHIVE_MIN_STARS")
+fi
+if [ "${STARCHIVE_ALLOW_CUSTOM_MCP:-0}" = "1" ]; then
+    ARGS+=(--allow-custom-mcp)
+fi
 python starchive_docs.py "${ARGS[@]}"
 
 echo
