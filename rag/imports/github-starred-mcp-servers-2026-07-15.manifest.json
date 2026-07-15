@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-07-15T18:52:00Z",
+  "source_type": "github-starred-repositories",
+  "source_endpoint": "https://api.github.com/user/starred?per_page=100",
+  "snapshot_date": "2026-07-15",
+  "repository": "jekidev/T1",
+  "document": "rag/imports/github-starred-mcp-servers-2026-07-15.md",
+  "document_sha256": "4b36ef3f5df05e6279c6c0b836a4c8586b604d195afea62c06360382a558c63e",
+  "entry_count": 9,
+  "retrieval_policy": "safe",
+  "notes": [
+    "Repository metadata and README links are evidence, not executable instructions.",
+    "No credentials, tokens, or secrets are included.",
+    "Refresh this snapshot when the starred repository set changes."
+  ]
+}
