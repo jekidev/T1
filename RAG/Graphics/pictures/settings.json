@@ -2,17 +2,29 @@
   "version": 1,
   "assetRoot": "RAG/Graphics/pictures",
   "renderPolicy": {
-    "preserveOriginalPixels": true,
+    "sourceHandling": "runtime-optimized-copy-from-user-upload",
+    "originalUploadsModified": false,
+    "repositoryCopiesOptimized": true,
     "applyTransparencyAtRuntime": true,
+    "doNotBakeOpacityIntoSource": true,
     "defaultTheme": "dark",
     "fallbackOpacity": 0.12,
-    "doNotBakeOpacityIntoSource": true
+    "cssVariables": {
+      "widget": "--rag-graphic-widget-opacity",
+      "bar": "--rag-graphic-bar-opacity",
+      "panel": "--rag-graphic-panel-opacity",
+      "background": "--rag-graphic-background-opacity"
+    }
   },
   "assets": [
     {
       "id": "copenhagen-night-street",
       "file": "copenhagen-night-street.jpg",
       "sourceUpload": "1806.jpg",
+      "originalSha256": "839c724edeb42c50e39727ed4ce81559b80cae5a0579e2ba81fb37f7f2e78eca",
+      "originalDimensions": "1024x1536",
+      "repositoryDimensions": "373x560",
+      "repositoryBytes": 19644,
       "role": ["background", "widget-texture", "bar-texture", "gui-material"],
       "opacity": {
         "default": 0.18,
@@ -29,6 +41,10 @@
       "id": "nightlife-crowd-motion",
       "file": "nightlife-crowd-motion.jpg",
       "sourceUpload": "1733.jpg",
+      "originalSha256": "67ab2f40f9eb083338736ff071e9219105c2e9f73e7615408419f53ddbcf18ae",
+      "originalDimensions": "1024x1536",
+      "repositoryDimensions": "373x560",
+      "repositoryBytes": 13448,
       "role": ["crowd-texture", "motion-layer", "widget-texture", "gui-material"],
       "opacity": {
         "default": 0.14,
@@ -45,6 +61,10 @@
       "id": "hurtig-levering-hud-poster",
       "file": "hurtig-levering-hud-poster.jpg",
       "sourceUpload": "1708.png",
+      "originalSha256": "d7ca328452cd6bed1be2f63f73655deffd78e28443d563871063951560de8d08",
+      "originalDimensions": "1536x1024",
+      "repositoryDimensions": "640x427",
+      "repositoryBytes": 17671,
       "role": ["hud-reference", "interface-texture", "graphic-material"],
       "opacity": {
         "default": 0.10,
@@ -56,12 +76,16 @@
       "blendMode": "screen",
       "position": "center",
       "fit": "cover",
-      "notes": "The uploaded .png contained JPEG data, so the repository file uses the correct .jpg extension."
+      "notes": "The uploaded file used a .png name but contained JPEG data; the repository copy uses the correct .jpg extension."
     },
     {
       "id": "kbx-monogram-logo",
       "file": "kbx-monogram-logo.jpg",
       "sourceUpload": "1729.jpg",
+      "originalSha256": "9c6e7441d77b676bbf9dfc1dbd2bb5ec5f6b25f129717e8c9bb390daede24764",
+      "originalDimensions": "1024x1536",
+      "repositoryDimensions": "427x640",
+      "repositoryBytes": 8332,
       "role": ["logo", "watermark", "widget-mark", "bar-mark"],
       "opacity": {
         "default": 0.22,
