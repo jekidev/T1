@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bot, Send, ShieldAlert, Copy, Download, Upload, Settings2, ClipboardPaste, Check, TextSelect } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { LLM_MODE_META, useLlmMode } from "@/lib/llm-mode";
 import {
   buildAiProfileContext,
   createAiProfile,
@@ -22,6 +23,7 @@ interface Message { role: "user" | "assistant"; content: string; }
 
 export function AdvisorPanel() {
   const board = useBoardStore(s => s.board);
+  const [llmMode] = useLlmMode();
   const [selectedRole, setSelectedRole] = useState<AdvisorRole>("neutral_analyst");
   const [messages, setMessages] = useState<Message[]>([{ role: "assistant", content: "AI Advisor initialized. Select a profile and role, then play or develop the game together with AI." }]);
   const [input, setInput] = useState("");
@@ -64,7 +66,7 @@ export function AdvisorPanel() {
     if (!input.trim() || sendMessageMutation.isPending || !activeProfile) return;
     const userMsg = input.trim(); setInput(""); setMessages(prev => [...prev, { role: "user", content: userMsg }]);
     try {
-      const response = await sendMessageMutation.mutateAsync({ data: { role: selectedRole, message: `${buildAiProfileContext(activeProfile)}\n\nCurrent user request:\n${userMsg}`, board: board as any, history: messages.map(m => ({ role: m.role, content: m.content })) } });
+      const response = await sendMessageMutation.mutateAsync({ data: { role: selectedRole, message: `${buildAiProfileContext(activeProfile)}\n\n${LLM_MODE_META[llmMode].advisorInstruction}\n\nCurrent user request:\n${userMsg}`, board: board as any, history: messages.map(m => ({ role: m.role, content: m.content })) } });
       setMessages(prev => [...prev, { role: "assistant", content: response.reply }]);
     } catch { setMessages(prev => [...prev, { role: "assistant", content: "[ERROR: Communication with advisor failed. Check API connection.]" }]); }
   };
@@ -76,10 +78,10 @@ export function AdvisorPanel() {
   return (
     <div className={`w-full h-full flex flex-col border-l transition-colors select-text ${isRedTeam ? "border-destructive bg-destructive/5" : "border-border bg-sidebar"}`}>
       <div className={`px-4 py-3 border-b flex flex-col gap-2 ${isRedTeam ? "border-destructive/30 bg-destructive/10" : "border-border bg-sidebar-primary/5"}`}>
-        <div className="flex justify-between items-center"><div className="flex items-center gap-2 text-sm font-semibold">{isRedTeam ? <ShieldAlert className="h-4 w-4 text-destructive" /> : <Bot className="h-4 w-4 text-primary" />}AI Workspace</div><div className="flex items-center gap-1">{isRedTeam && <Badge variant="destructive" className="text-[10px]">RED TEAM GAME MODE</Badge>}<Button title="Copy entire conversation" variant="ghost" size="icon" className="h-7 w-7" onClick={() => void copyConversation()}><Copy className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowWorkspace(current => !current)}><Settings2 className="h-3.5 w-3.5" /></Button></div></div>
+        <div className="flex justify-between items-center"><div className="flex items-center gap-2 text-sm font-semibold">{isRedTeam ? <ShieldAlert className="h-4 w-4 text-destructive" /> : <Bot className="h-4 w-4 text-primary" />}AI Workspace <Badge variant="outline" className="text-[9px]">{LLM_MODE_META[llmMode].label}</Badge></div><div className="flex items-center gap-1">{isRedTeam && <Badge variant="destructive" className="text-[10px]">RED TEAM GAME MODE</Badge>}<Button title="Copy entire conversation" variant="ghost" size="icon" className="h-7 w-7" onClick={() => void copyConversation()}><Copy className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowWorkspace(current => !current)}><Settings2 className="h-3.5 w-3.5" /></Button></div></div>
         <Select value={activeProfileId} onValueChange={setActiveProfileId}><SelectTrigger className="h-8 text-xs"><SelectValue placeholder="AI profile" /></SelectTrigger><SelectContent>{profiles.map(profile => <SelectItem key={profile.id} value={profile.id} className="text-xs">{profile.name}</SelectItem>)}</SelectContent></Select>
         <Select value={selectedRole} onValueChange={val => setSelectedRole(val as AdvisorRole)}><SelectTrigger className={`h-8 text-xs ${isRedTeam ? "border-destructive/50" : ""}`}><SelectValue placeholder="Select Role" /></SelectTrigger><SelectContent>{ADVISOR_ROLES.map(role => <SelectItem key={role.id} value={role.id} className="text-xs">{role.name}</SelectItem>)}</SelectContent></Select>
-        <div className="text-[10px] text-muted-foreground italic leading-tight">{activeProfile?.description || roleMeta?.tagline}</div>
+        <div className="text-[10px] text-muted-foreground italic leading-tight">{activeProfile?.description || roleMeta?.tagline} · {LLM_MODE_META[llmMode].short}</div>
         {showWorkspace && activeProfile && <div className="space-y-2 rounded-md border border-border bg-background/60 p-2"><div className="grid grid-cols-3 gap-1">{(["rotate", "static", "off"] as const).map(mode => <Button key={mode} variant={activeProfile.routing.mode === mode ? "default" : "outline"} size="sm" className="h-7 text-[10px]" onClick={() => updateActiveProfile(profile => ({ ...profile, routing: { ...profile.routing, mode } }))}>{mode}</Button>)}</div><input className="w-full rounded border border-input bg-background px-2 py-1 text-[10px]" value={activeProfile.name} onChange={event => updateActiveProfile(profile => ({ ...profile, name: event.target.value }))} /><Textarea className="min-h-20 text-[10px]" value={activeProfile.systemPrompt} onChange={event => updateActiveProfile(profile => ({ ...profile, systemPrompt: event.target.value }))} /><Textarea className="min-h-16 text-[10px]" value={activeProfile.rules.join("\n")} onChange={event => updateActiveProfile(profile => ({ ...profile, rules: event.target.value.split("\n").filter(Boolean) }))} placeholder="One rule per line" /><Textarea className="min-h-12 text-[10px]" value={activeProfile.skills.join(", ")} onChange={event => updateActiveProfile(profile => ({ ...profile, skills: event.target.value.split(",").map(value => value.trim()).filter(Boolean) }))} placeholder="Skills" /><div className="flex flex-wrap gap-1">{activeProfile.mcpServers.map(server => <Button key={server.id} variant={server.enabled ? "default" : "outline"} size="sm" className="h-7 text-[10px]" onClick={() => updateActiveProfile(profile => ({ ...profile, mcpServers: profile.mcpServers.map(item => item.id === server.id ? { ...item, enabled: !item.enabled } : item) }))}>{server.name}</Button>)}</div><div className="flex gap-1"><Button variant="outline" size="sm" className="h-7 flex-1 text-[10px]" onClick={duplicateProfile}><Copy className="mr-1 h-3 w-3" />Duplicate</Button><Button variant="outline" size="sm" className="h-7 flex-1 text-[10px]" onClick={exportProfile}><Download className="mr-1 h-3 w-3" />Export</Button><Button variant="outline" size="sm" className="h-7 flex-1 text-[10px]" onClick={() => importRef.current?.click()}><Upload className="mr-1 h-3 w-3" />Import</Button><input ref={importRef} type="file" accept="application/json" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void importProfile(file); }} /></div></div>}
       </div>
 
