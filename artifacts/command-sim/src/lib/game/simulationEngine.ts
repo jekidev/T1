@@ -79,9 +79,11 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
   const mediaChange = current.cityTension > 55 ? 3 : randomValues[2]! > 0.85 ? 2 : -1;
   const publicChange = -Math.max(0, tensionChange) * 0.5 + (randomValues[3]! > 0.75 ? 1 : 0);
 
+  const [narrativeSeed, narrativeRandom] = nextRandom(seed);
+
   const next: SimulationState = {
     ...current,
-    seed,
+    seed: narrativeSeed,
     turn: current.turn + 1,
     day: current.day + (current.hour >= 20 ? 1 : 0),
     hour: current.hour >= 20 ? 8 : current.hour + 4,
@@ -113,7 +115,7 @@ export function simulateTurn(board: BoardState, action?: PlayerTurnAction): Turn
     moveHistory: [...board.moveHistory, { id: nanoid(10), summary: action ? `Player action: ${action.type}` : "No player action", actorFaction: null, createdAt: new Date().toISOString() }],
   };
 
-  const narrativeEvents = selectNarrativeEvents(nextBoard);
+  const narrativeEvents = selectNarrativeEvents(nextBoard, narrativeRandom);
   nextBoard.timelineEvents = [...nextBoard.timelineEvents, ...narrativeEvents];
 
   const eventSummary = narrativeEvents.length > 0

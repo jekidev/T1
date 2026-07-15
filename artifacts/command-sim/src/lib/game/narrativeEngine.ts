@@ -158,14 +158,18 @@ function matches(template: NarrativeEventTemplate, board: BoardState): boolean {
   return true;
 }
 
-export function selectNarrativeEvents(board: BoardState, catalog: NarrativeEventTemplate[] = DEFAULT_NARRATIVE_CATALOG): TimelineEvent[] {
+export function selectNarrativeEvents(
+  board: BoardState,
+  randomValue: number,
+  catalog: NarrativeEventTemplate[] = DEFAULT_NARRATIVE_CATALOG,
+): TimelineEvent[] {
   const matchesSet = catalog.filter((template) => matches(template, board));
   if (matchesSet.length === 0) return [];
 
-  // Weighted random selection of up to one event per call so the timeline
+  // Deterministic weighted selection of up to one event per call so the timeline
   // stays readable and events feel distinct rather than spammy.
   const totalWeight = matchesSet.reduce((sum, t) => sum + t.weight, 0);
-  let roll = Math.random() * totalWeight;
+  let roll = (randomValue % 1) * totalWeight;
   for (const template of matchesSet) {
     roll -= template.weight;
     if (roll <= 0) {
