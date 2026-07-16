@@ -13,10 +13,37 @@ const vendors = [
     required: true,
   },
   {
+    name: 'telegram-mcp-1',
+    repository: 'https://github.com/jekidev/telegram-mcp-1.git',
+    branch: 'main',
+    required: true,
+  },
+  {
     name: 'tg_auth_api',
     repository: 'https://github.com/megahomyak/tg_auth_api.git',
     branch: 'master',
     required: true,
+  },
+  {
+    name: 'agents-sms',
+    repository: 'https://github.com/gonchasobaka/agents-sms.git',
+    branch: 'main',
+    required: true,
+    patch: path.join(root, 'patches', 'agents-sms-pivots.patch'),
+    build: [
+      ['npm', ['install', '--ignore-scripts']],
+      ['node', ['node_modules/esbuild/bin/esbuild', 'src/index.ts', '--bundle', '--platform=node', '--outfile=dist/index.js', '--format=cjs']],
+    ],
+  },
+  {
+    name: 'signal-cli-mcp',
+    repository: 'https://github.com/jiridudekusy/signal-cli-mcp.git',
+    branch: 'main',
+    required: true,
+    build: [
+      ['npm', ['install']],
+      ['npm', ['run', 'build']],
+    ],
   },
 ];
 
@@ -45,6 +72,18 @@ for (const vendor of vendors) {
       console.log(`Cloning ${vendor.name}...`);
       await run('git', ['clone', '--depth', '1', '--branch', vendor.branch, vendor.repository, target]);
     }
+
+    if (vendor.patch && await exists(vendor.patch)) {
+      console.log(`Applying patch to ${vendor.name}...`);
+      await run('git', ['apply', '--whitespace=nowarn', vendor.patch], target);
+    }
+
+    if (vendor.build) {
+      console.log(`Building ${vendor.name}...`);
+      for (const [command, args] of vendor.build) {
+        await run(command, args, target);
+      }
+    }
   } catch (error) {
     console.error(`Failed to install ${vendor.name}:`, error instanceof Error ? error.message : error);
     if (vendor.required) process.exitCode = 1;
@@ -54,3 +93,6 @@ for (const vendor of vendors) {
 console.log('\nMCP vendor setup complete.');
 console.log('Telegram credentials must be stored in platform secrets, never committed.');
 console.log('Run Telegram MCP with TELEGRAM_EXPOSED_TOOLS=all only when modify tools are intended and approved.');
+console.log('5sim SMS API requires FIVESIM_API_KEY (or SMSACTIVATE_API_KEY / ONLINESIM_API_KEY) in environment variables.');
+console.log('Signal CLI MCP requires SIGNAL_ACCOUNT and a running signal-cli-rest-api instance (see docker-compose in integrations/vendor/signal-cli-mcp).');
+console.log('telegram-mcp-1 requires TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION_STRING (or TELEGRAM_SESSION_NAME) in environment variables.');

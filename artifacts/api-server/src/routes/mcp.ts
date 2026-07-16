@@ -42,16 +42,89 @@ async function writeMemories(memories: MemoryRecord[]) {
   await fs.writeFile(memoryFile, JSON.stringify(memories, null, 2), "utf8");
 }
 
+let cachedRegistry: McpServerRecord[] | null = null;
+let cachedRegistryAt = 0;
+const REGISTRY_CACHE_TTL_MS = 30_000;
+
 async function readRegistry(): Promise<McpServerRecord[]> {
+  const now = Date.now();
+  if (cachedRegistry && now - cachedRegistryAt < REGISTRY_CACHE_TTL_MS) {
+    return cachedRegistry;
+  }
   const file = path.resolve(process.cwd(), "integrations/mcp/servers.json");
   const parsed = JSON.parse(await fs.readFile(file, "utf8")) as { servers: McpServerRecord[] };
-  return parsed.servers;
+  cachedRegistry = parsed.servers;
+  cachedRegistryAt = now;
+  return cachedRegistry;
+}
+
+function getConfigStatus(server: McpServerRecord): { configured: boolean; missingEnvironment: string[] } {
+  if (server.kind === "internal" || server.env.length === 0) {
+    return { configured: true, missingEnvironment: [] };
+  }
+  const missingEnvironment = server.env.filter((name) => !process.env[name]?.trim());
+  return { configured: missingEnvironment.length === 0, missingEnvironment };
 }
 
 function configured(server: McpServerRecord): boolean {
-  if (server.kind === "internal") return true;
-  if (server.env.length === 0) return true;
-  return server.env.every((name) => Boolean(process.env[name]?.trim()));
+  return getConfigStatus(server).configured;
+}
+
+async function checkCommandExists(server: McpServerRecord): Promise<boolean | null> {
+  if (!server.command || !server.args) return null;
+
+  if (server.command === "node" && server.args.length > 0) {
+    const script = server.args[0];
+    if (!script.startsWith("-")) {
+      try {
+        await fs.stat(path.resolve(process.cwd(), script));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  if (server.command === "uv" && server.args.includes("--directory") && server.args.includes("run")) {
+    const dirIndex = server.args.indexOf("--directory") + 1;
+    const runIndex = server.args.indexOf("run") + 1;
+    if (dirIndex > 0 && runIndex > 0 && dirIndex < server.args.length && runIndex < server.args.length) {
+      const scriptPath = path.join(server.args[dirIndex], server.args[runIndex]);
+      try {
+        await fs.stat(path.resolve(process.cwd(), scriptPath));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  return null;
+}
+
+async function redactEnvValues(text: string): Promise<string> {
+  try {
+    const servers = await readRegistry();
+    const secretNames = new Set<string>();
+    for (const server of servers) {
+      for (const name of server.env) secretNames.add(name);
+    }
+
+    const secrets: string[] = [];
+    for (const name of secretNames) {
+      const value = process.env[name]?.trim();
+      if (value && value.length >= 4) secrets.push(value);
+    }
+
+    secrets.sort((a, b) => b.length - a.length);
+    let redacted = text;
+    for (const secret of secrets) {
+      redacted = redacted.replaceAll(secret, "[REDACTED]");
+    }
+    return redacted;
+  } catch {
+    return text;
+  }
 }
 
 function allowedRoots(): string[] {
@@ -74,11 +147,33 @@ function resolveAllowedPath(input: string): string {
 router.get("/mcp/servers", async (_req, res): Promise<void> => {
   const servers = await readRegistry();
   res.json({
-    servers: servers.map((server) => ({
-      ...server,
-      configured: configured(server),
-      missingEnvironment: server.env.filter((name) => !process.env[name]?.trim()),
-    })),
+    servers: servers.map((server) => {
+      const { configured, missingEnvironment } = getConfigStatus(server);
+      return { ...server, configured, missingEnvironment };
+    }),
+  });
+});
+
+router.get("/mcp/servers/:id/health", async (req, res): Promise<void> => {
+  const servers = await readRegistry();
+  const server = servers.find((s) => s.id === req.params.id);
+  if (!server) {
+    res.status(404).json({ message: "MCP server not found" });
+    return;
+  }
+
+  const { configured, missingEnvironment } = getConfigStatus(server);
+  const commandExists = await checkCommandExists(server);
+
+  res.json({
+    id: server.id,
+    name: server.name,
+    kind: server.kind,
+    transport: server.transport,
+    configured,
+    missingEnvironment,
+    commandExists,
+    healthy: configured && commandExists !== false,
   });
 });
 
@@ -118,7 +213,8 @@ router.get("/mcp/filesystem/list", async (req, res): Promise<void> => {
       entries: entries.slice(0, 500).map((entry) => ({ name: entry.name, type: entry.isDirectory() ? "directory" : "file" })),
     });
   } catch (error) {
-    res.status(400).json({ message: error instanceof Error ? error.message : String(error) });
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ message: await redactEnvValues(rawMessage) });
   }
 });
 
@@ -130,7 +226,8 @@ router.get("/mcp/filesystem/read", async (req, res): Promise<void> => {
     const content = await fs.readFile(target, "utf8");
     res.json({ path: path.relative(process.cwd(), target), content });
   } catch (error) {
-    res.status(400).json({ message: error instanceof Error ? error.message : String(error) });
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ message: await redactEnvValues(rawMessage) });
   }
 });
 
