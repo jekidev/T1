@@ -66,7 +66,7 @@ export interface BoardZone { id: string; name: string; kind: ZoneKind; x: number
 export interface BoardLayer { id: string; name: string; visible: boolean; locked: boolean; order: number; }
 export interface ScenarioPhase { id: string; name: string; description: string; order: number; }
 export type TimelineEventSeverity = "info" | "caution" | "critical";
-export interface TimelineEvent { id: string; phaseId: string | null; label: string; description: string; severity: TimelineEventSeverity; createdAt: string; sourceStatus?: FactStatus; }
+export interface TimelineEvent { id: string; phaseId: string | null; label: string; description: string; severity: TimelineEventSeverity; createdAt: string; sourceStatus?: FactStatus; narrativePatternId?: string; }
 export interface MoveLogEntry { id: string; summary: string; actorFaction: Faction | null; createdAt: string; }
 
 export interface GeneratedFaction { name: string; faction: Faction; role: string; goal: string; }
