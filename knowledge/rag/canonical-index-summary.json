@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-07-16T02:53:09.301057+00:00",
+  "purpose": "canonical-only retrieval indexes; originals preserved",
+  "safe": {
+    "source": "safe-index.jsonl",
+    "canonical": "safe-index-canonical.jsonl",
+    "canonical_rows": 532
+  },
+  "quarantine": {
+    "source": "quarantine-index.jsonl",
+    "canonical": "quarantine-index-canonical.jsonl",
+    "canonical_rows": 255
+  }
+}

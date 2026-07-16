@@ -12,6 +12,7 @@ import evolveRouter from "./evolve";
 import ragRouter from "./rag";
 import sourceDebugRouter from "./source-debug";
 import llmHeadsUpRouter from "./llm-heads-up";
+import knowledgeRouter from "./knowledge";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,7 @@ router.use(evolveRouter);
 router.use(ragRouter);
 router.use(sourceDebugRouter);
 router.use(llmHeadsUpRouter);
+router.use(knowledgeRouter);
 router.use(advisorRouter);
 
 export default router;
