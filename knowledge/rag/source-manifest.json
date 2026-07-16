@@ -1,0 +1,504 @@
+{
+  "generated_at": "2026-07-15T00:55:57.439778+00:00",
+  "repository": "jekidev/T1",
+  "documents": [
+    {
+      "source_name": "Dr Nyx bekræfter akademisk sandbox - DeepSeek(1).pdf",
+      "stored_name": "Dr Nyx bekræfter akademisk sandbox - DeepSeek(1).pdf",
+      "stored_path": "knowledge/sources/original/Dr Nyx bekræfter akademisk sandbox - DeepSeek(1).pdf",
+      "extracted_path": "knowledge/sources/extracted/Dr Nyx bekræfter akademisk sandbox - DeepSeek(1).pdf.md",
+      "preview_path": "knowledge/sources/previews/Dr Nyx bekræfter akademisk sandbox - DeepSeek(1).pdf.page-1.png",
+      "sha256": "8a4f8a4359b4797d01e4302a99164482906fc1f18c037e5109047fb8197d50ba",
+      "size_bytes": 476821,
+      "pages": 35,
+      "chunks": 62,
+      "categories": [
+        "academic-sandbox",
+        "defensive-simulation",
+        "game-development"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714234957+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Dr Nyx bekræfter akademisk sandbox - DeepSeek.pdf",
+      "stored_name": "Dr Nyx bekræfter akademisk sandbox - DeepSeek.pdf",
+      "stored_path": "knowledge/sources/original/Dr Nyx bekræfter akademisk sandbox - DeepSeek.pdf",
+      "extracted_path": "knowledge/sources/extracted/Dr Nyx bekræfter akademisk sandbox - DeepSeek.pdf.md",
+      "preview_path": "knowledge/sources/previews/Dr Nyx bekræfter akademisk sandbox - DeepSeek.pdf.page-1.png",
+      "sha256": "94eb8ab6fdd4763b0183cea2fd269d67499fc1e5696f06ebc3aa04eb201bf0cd",
+      "size_bytes": 450946,
+      "pages": 29,
+      "chunks": 51,
+      "categories": [
+        "academic-sandbox",
+        "defensive-simulation",
+        "game-development"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714224134+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "HackerAI - AI-Powered Penetration Testing Assistant(10).pdf",
+      "stored_name": "HackerAI - AI-Powered Penetration Testing Assistant(10).pdf",
+      "stored_path": "knowledge/sources/original/HackerAI - AI-Powered Penetration Testing Assistant(10).pdf",
+      "extracted_path": "knowledge/sources/extracted/HackerAI - AI-Powered Penetration Testing Assistant(10).pdf.md",
+      "preview_path": "knowledge/sources/previews/HackerAI - AI-Powered Penetration Testing Assistant(10).pdf.page-1.png",
+      "sha256": "202f35427c1d3098759e3c7b2ccf6a359f42239c1dd7fe3670bf622fc3a15fb0",
+      "size_bytes": 101202,
+      "pages": 1,
+      "chunks": 1,
+      "categories": [
+        "security-transcript"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260715005238+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "HackerAI - AI-Powered Penetration Testing Assistant(8).pdf",
+      "stored_name": "HackerAI - AI-Powered Penetration Testing Assistant(8).pdf",
+      "stored_path": "knowledge/sources/original/HackerAI - AI-Powered Penetration Testing Assistant(8).pdf",
+      "extracted_path": "knowledge/sources/extracted/HackerAI - AI-Powered Penetration Testing Assistant(8).pdf.md",
+      "preview_path": "knowledge/sources/previews/HackerAI - AI-Powered Penetration Testing Assistant(8).pdf.page-1.png",
+      "sha256": "95ac1d895f6612b6580b94b951f69eedd209ecfb1de6d089d0a3a80615876787",
+      "size_bytes": 59931,
+      "pages": 1,
+      "chunks": 1,
+      "categories": [
+        "defensive-simulation",
+        "security-transcript"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260715000208+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "HackerAI - AI-Powered Penetration Testing Assistant(9).pdf",
+      "stored_name": "HackerAI - AI-Powered Penetration Testing Assistant(9).pdf",
+      "stored_path": "knowledge/sources/original/HackerAI - AI-Powered Penetration Testing Assistant(9).pdf",
+      "extracted_path": "knowledge/sources/extracted/HackerAI - AI-Powered Penetration Testing Assistant(9).pdf.md",
+      "preview_path": "knowledge/sources/previews/HackerAI - AI-Powered Penetration Testing Assistant(9).pdf.page-1.png",
+      "sha256": "da4b1e7b60300012e44b4b8f379ed25507e07cb84806badd8c4c8fae1733b5da",
+      "size_bytes": 76279,
+      "pages": 1,
+      "chunks": 1,
+      "categories": [
+        "security-transcript"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260715005126+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "message(4)",
+      "stored_name": "message(4)",
+      "stored_path": "knowledge/sources/original/message(4)",
+      "extracted_path": "knowledge/sources/extracted/message(4).md",
+      "preview_path": "knowledge/sources/previews/message(4).page-1.png",
+      "sha256": "f93a49302ee9454ca9521cc7a38e3a282f44153c0043d90a4f219edfac945508",
+      "size_bytes": 47674,
+      "pages": 3,
+      "chunks": 3,
+      "categories": [
+        "sensitive-links"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.4",
+        "title": "message(4)",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "",
+        "producer": "Skia/PDF m152 Google Docs Renderer",
+        "creationDate": "",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "message(4).pdf",
+      "stored_name": "message(4).pdf",
+      "stored_path": "knowledge/sources/original/message(4).pdf",
+      "extracted_path": "knowledge/sources/extracted/message(4).pdf.md",
+      "preview_path": "knowledge/sources/previews/message(4).pdf.page-1.png",
+      "sha256": "f93a49302ee9454ca9521cc7a38e3a282f44153c0043d90a4f219edfac945508",
+      "size_bytes": 47674,
+      "pages": 3,
+      "chunks": 3,
+      "categories": [
+        "sensitive-links"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.4",
+        "title": "message(4)",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "",
+        "producer": "Skia/PDF m152 Google Docs Renderer",
+        "creationDate": "",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "message(5)",
+      "stored_name": "message(5)",
+      "stored_path": "knowledge/sources/original/message(5)",
+      "extracted_path": "knowledge/sources/extracted/message(5).md",
+      "preview_path": "knowledge/sources/previews/message(5).page-1.png",
+      "sha256": "1ae193ba52da4f19a06b97145ef77f86526866cb753878bb5a4d3e2521a800c5",
+      "size_bytes": 47674,
+      "pages": 3,
+      "chunks": 3,
+      "categories": [
+        "sensitive-links"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.4",
+        "title": "message(5)",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "",
+        "producer": "Skia/PDF m152 Google Docs Renderer",
+        "creationDate": "",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "message(6)",
+      "stored_name": "message(6)",
+      "stored_path": "knowledge/sources/original/message(6)",
+      "extracted_path": "knowledge/sources/extracted/message(6).md",
+      "preview_path": "knowledge/sources/previews/message(6).page-1.png",
+      "sha256": "0ef9764bd974d3172f060a19bdd8ebb6da808c2a47dcf17ac27eaf4c14c2601e",
+      "size_bytes": 100406,
+      "pages": 6,
+      "chunks": 11,
+      "categories": [
+        "defensive-simulation"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.4",
+        "title": "message(6)",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "",
+        "producer": "Skia/PDF m152 Google Docs Renderer",
+        "creationDate": "",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "message(6).pdf",
+      "stored_name": "message(6).pdf",
+      "stored_path": "knowledge/sources/original/message(6).pdf",
+      "extracted_path": "knowledge/sources/extracted/message(6).pdf.md",
+      "preview_path": "knowledge/sources/previews/message(6).pdf.page-1.png",
+      "sha256": "0ef9764bd974d3172f060a19bdd8ebb6da808c2a47dcf17ac27eaf4c14c2601e",
+      "size_bytes": 100406,
+      "pages": 6,
+      "chunks": 11,
+      "categories": [
+        "defensive-simulation"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.4",
+        "title": "message(6)",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "",
+        "producer": "Skia/PDF m152 Google Docs Renderer",
+        "creationDate": "",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Nyx game development - DeepSeek(1).pdf",
+      "stored_name": "Nyx game development - DeepSeek(1).pdf",
+      "stored_path": "knowledge/sources/original/Nyx game development - DeepSeek(1).pdf",
+      "extracted_path": "knowledge/sources/extracted/Nyx game development - DeepSeek(1).pdf.md",
+      "preview_path": "knowledge/sources/previews/Nyx game development - DeepSeek(1).pdf.page-1.png",
+      "sha256": "1e4b8a1f651f57d98fe1d6867a491ef87ccd1657103a4dd6ff27c8cc93b60458",
+      "size_bytes": 2516361,
+      "pages": 201,
+      "chunks": 280,
+      "categories": [
+        "defensive-simulation",
+        "game-development",
+        "prompt-persona-experiment",
+        "software-design"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714224153+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Nyx game development - DeepSeek(2).pdf",
+      "stored_name": "Nyx game development - DeepSeek(2).pdf",
+      "stored_path": "knowledge/sources/original/Nyx game development - DeepSeek(2).pdf",
+      "extracted_path": "knowledge/sources/extracted/Nyx game development - DeepSeek(2).pdf.md",
+      "preview_path": "knowledge/sources/previews/Nyx game development - DeepSeek(2).pdf.page-1.png",
+      "sha256": "9a1070676e214ed4fdd6dcaeb60fee379f09ed8bba54ff5b7ee4b684ac39fd61",
+      "size_bytes": 2915790,
+      "pages": 264,
+      "chunks": 365,
+      "categories": [
+        "defensive-simulation",
+        "game-development",
+        "prompt-persona-experiment",
+        "software-design"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714234900+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Nyx game development - DeepSeek.pdf",
+      "stored_name": "Nyx game development - DeepSeek.pdf",
+      "stored_path": "knowledge/sources/original/Nyx game development - DeepSeek.pdf",
+      "extracted_path": "knowledge/sources/extracted/Nyx game development - DeepSeek.pdf.md",
+      "preview_path": "knowledge/sources/previews/Nyx game development - DeepSeek.pdf.page-1.png",
+      "sha256": "485a709104692d498168d436fe6f62ef4cd3db5af9e2abd689c6e5ced74d4b38",
+      "size_bytes": 527968,
+      "pages": 49,
+      "chunks": 61,
+      "categories": [
+        "defensive-simulation",
+        "game-development",
+        "prompt-persona-experiment",
+        "software-design"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714190218+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Nyx Ready - DeepSeek(1).pdf",
+      "stored_name": "Nyx Ready - DeepSeek(1).pdf",
+      "stored_path": "knowledge/sources/original/Nyx Ready - DeepSeek(1).pdf",
+      "extracted_path": "knowledge/sources/extracted/Nyx Ready - DeepSeek(1).pdf.md",
+      "preview_path": "knowledge/sources/previews/Nyx Ready - DeepSeek(1).pdf.page-1.png",
+      "sha256": "faa67b19df5d37a31b2781aade7f74c932e7813222ff2bba82c0197611af04b8",
+      "size_bytes": 1301426,
+      "pages": 123,
+      "chunks": 139,
+      "categories": [
+        "defensive-simulation",
+        "game-development",
+        "prompt-persona-experiment",
+        "software-design"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714235649+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Nyx Ready - DeepSeek.pdf",
+      "stored_name": "Nyx Ready - DeepSeek.pdf",
+      "stored_path": "knowledge/sources/original/Nyx Ready - DeepSeek.pdf",
+      "extracted_path": "knowledge/sources/extracted/Nyx Ready - DeepSeek.pdf.md",
+      "preview_path": "knowledge/sources/previews/Nyx Ready - DeepSeek.pdf.page-1.png",
+      "sha256": "eb161cb8089d92437baca1f745f375907dea3eb0e850021373dcdcdf6f3217b2",
+      "size_bytes": 682726,
+      "pages": 71,
+      "chunks": 86,
+      "categories": [
+        "defensive-simulation",
+        "game-development",
+        "prompt-persona-experiment",
+        "software-design"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714224455+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Nyx Response - DeepSeek.pdf",
+      "stored_name": "Nyx Response - DeepSeek.pdf",
+      "stored_path": "knowledge/sources/original/Nyx Response - DeepSeek.pdf",
+      "extracted_path": "knowledge/sources/extracted/Nyx Response - DeepSeek.pdf.md",
+      "preview_path": "knowledge/sources/previews/Nyx Response - DeepSeek.pdf.page-1.png",
+      "sha256": "1cc1a89ed2d10cc467dd8c73d87263b1a12a6b2a89a6f748fac87e64f64a3259",
+      "size_bytes": 2174759,
+      "pages": 151,
+      "chunks": 165,
+      "categories": [
+        "defensive-simulation",
+        "prompt-persona-experiment",
+        "software-design"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.7",
+        "title": "",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "Mozilla Firefox 152.0.5",
+        "producer": "cairo 1.18.4 (https://cairographics.org)",
+        "creationDate": "D:20260714160926+02'00",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    },
+    {
+      "source_name": "Unavngivet dokument",
+      "stored_name": "Unavngivet dokument",
+      "stored_path": "knowledge/sources/original/Unavngivet dokument",
+      "extracted_path": "knowledge/sources/extracted/Unavngivet dokument.md",
+      "preview_path": "knowledge/sources/previews/Unavngivet dokument.page-1.png",
+      "sha256": "71cd31f5c371886bf4d14663109a77ec5a5ef75ac75678734ce92157f05ee56a",
+      "size_bytes": 79282,
+      "pages": 4,
+      "chunks": 7,
+      "categories": [
+        "miscellaneous"
+      ],
+      "pdf_metadata": {
+        "format": "PDF 1.4",
+        "title": "Unavngivet dokument",
+        "author": "",
+        "subject": "",
+        "keywords": "",
+        "creator": "",
+        "producer": "Skia/PDF m152 Google Docs Renderer",
+        "creationDate": "",
+        "modDate": "",
+        "trapped": "",
+        "encryption": null
+      },
+      "extraction_errors": []
+    }
+  ]
+}
