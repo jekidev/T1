@@ -29,6 +29,7 @@ const vendors = [
     repository: 'https://github.com/gonchasobaka/agents-sms.git',
     branch: 'main',
     required: true,
+    patch: path.join(root, 'patches', 'agents-sms-cache.patch'),
     build: [
       ['npm', ['install', '--ignore-scripts']],
       ['node', ['node_modules/esbuild/bin/esbuild', 'src/index.ts', '--bundle', '--platform=node', '--outfile=dist/index.js', '--format=cjs']],
@@ -70,6 +71,11 @@ for (const vendor of vendors) {
     } else {
       console.log(`Cloning ${vendor.name}...`);
       await run('git', ['clone', '--depth', '1', '--branch', vendor.branch, vendor.repository, target]);
+    }
+
+    if (vendor.patch && await exists(vendor.patch)) {
+      console.log(`Applying patch to ${vendor.name}...`);
+      await run('git', ['apply', '--whitespace=nowarn', vendor.patch], target);
     }
 
     if (vendor.build) {
