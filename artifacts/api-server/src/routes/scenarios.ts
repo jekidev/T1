@@ -30,6 +30,19 @@ function isValidAction(body: unknown): body is PlayerTurnAction {
   return true;
 }
 
+// Simple in-memory rate limiter for turn resolution per scenario.
+// Production deployments should use Redis or another shared store.
+const RESOLVE_COOLDOWN_MS = 5000;
+const resolveLastUsed = new Map<number, number>();
+
+function canResolveTurn(scenarioId: number): boolean {
+  const now = Date.now();
+  const last = resolveLastUsed.get(scenarioId) ?? 0;
+  if (now - last < RESOLVE_COOLDOWN_MS) return false;
+  resolveLastUsed.set(scenarioId, now);
+  return true;
+}
+
 router.get("/scenarios", async (req, res) => {
   const rows = await db
     .select({
@@ -95,6 +108,10 @@ router.patch("/scenarios/:id", async (req, res): Promise<void> => {
 
 router.post("/scenarios/:id/resolve", async (req, res): Promise<void> => {
   const id = Number(req.params["id"]);
+  if (!canResolveTurn(id)) {
+    res.status(429).json({ message: "Turn resolution rate limit exceeded; please wait before resolving again" });
+    return;
+  }
   const [row] = await db
     .select()
     .from(scenariosTable)

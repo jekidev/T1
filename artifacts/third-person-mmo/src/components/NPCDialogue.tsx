@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAdvisorChat } from '../hooks/useAdvisorChat';
 import { useResolveTurn } from '../hooks/useResolveTurn';
 import type { PlayerTurnAction } from '../lib/api';
@@ -18,7 +18,17 @@ const ACTION_TYPES: PlayerTurnAction['type'][] = [
   'wait',
 ];
 
-export default function NPCDialogue({ scenarioId, board }: { scenarioId: number; board: Record<string, any> }) {
+export default function NPCDialogue({
+  scenarioId,
+  board,
+  selectedNpcId: externalSelectedNpcId,
+  onSelectNpc,
+}: {
+  scenarioId: number;
+  board: Record<string, any>;
+  selectedNpcId?: string;
+  onSelectNpc?: (id: string) => void;
+}) {
   const simulation = (board.simulation ?? {}) as Record<string, any>;
   const entities = (board.entities ?? []) as Array<Record<string, any>>;
   const factions = (simulation.factions ?? []) as Array<Record<string, any>>;
@@ -30,7 +40,8 @@ export default function NPCDialogue({ scenarioId, board }: { scenarioId: number;
     return factions;
   }, [entities, factions]);
 
-  const [selectedNpc, setSelectedNpc] = useState<string>(npcs[0]?.id ?? '');
+  const [internalSelectedNpc, setInternalSelectedNpc] = useState<string>(npcs[0]?.id ?? '');
+  const selectedNpc = externalSelectedNpcId ?? internalSelectedNpc;
   const [role, setRole] = useState('story_director');
   const [message, setMessage] = useState('');
   const [reply, setReply] = useState('');
@@ -44,6 +55,12 @@ export default function NPCDialogue({ scenarioId, board }: { scenarioId: number;
     const found = npcs.find((n) => n.id === selectedNpc);
     return found?.name ?? found?.faction ?? 'Unknown';
   }, [npcs, selectedNpc]);
+
+  useEffect(() => {
+    if (externalSelectedNpcId === undefined) {
+      setInternalSelectedNpc(npcs[0]?.id ?? '');
+    }
+  }, [npcs, externalSelectedNpcId]);
 
   async function handleSend() {
     if (!message.trim()) return;
@@ -72,7 +89,11 @@ export default function NPCDialogue({ scenarioId, board }: { scenarioId: number;
           <select
             className="w-full bg-slate-900 text-slate-100 rounded px-3 py-2 mt-1"
             value={selectedNpc}
-            onChange={(e) => setSelectedNpc(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setInternalSelectedNpc(id);
+              onSelectNpc?.(id);
+            }}
           >
             {npcs.map((npc) => (
               <option key={npc.id as string} value={npc.id as string}>{npc.name ?? npc.faction ?? npc.id}</option>

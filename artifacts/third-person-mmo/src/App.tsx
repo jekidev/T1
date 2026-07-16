@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import NPCDialogue from './components/NPCDialogue';
+import type { SceneEntity } from './components/Scene3D';
 import { useScenario, useScenarios } from './hooks/useScenarios';
 import type { Scenario } from './lib/api';
 import { validateBoardMapping, type BoardMappingIssue } from './lib/validateBoardMapping';
@@ -9,6 +10,7 @@ const Scene3D = lazy(() => import('./components/Scene3D'));
 export default function App() {
   const { data: scenarios, isLoading: scenariosLoading, error: scenariosError } = useScenarios();
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
+  const [selectedNpcId, setSelectedNpcId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (scenarios && scenarios.length > 0 && selectedId === undefined) {
@@ -48,15 +50,33 @@ export default function App() {
           </select>
         </div>
       )}
-      {scenario && <ScenarioPanel scenario={scenario} issues={issues} />}
+      {scenario && (
+        <ScenarioPanel
+          scenario={scenario}
+          issues={issues}
+          selectedNpcId={selectedNpcId}
+          onSelectNpc={setSelectedNpcId}
+        />
+      )}
     </div>
   );
 }
 
-function ScenarioPanel({ scenario, issues }: { scenario: Scenario; issues: BoardMappingIssue[] }) {
+function ScenarioPanel({
+  scenario,
+  issues,
+  selectedNpcId,
+  onSelectNpc,
+}: {
+  scenario: Scenario;
+  issues: BoardMappingIssue[];
+  selectedNpcId?: string;
+  onSelectNpc?: (id: string) => void;
+}) {
   const board = (scenario.board ?? {}) as Record<string, any>;
   const simulation = (board.simulation ?? {}) as Record<string, any>;
   const factions = (simulation.factions ?? []) as Array<Record<string, any>>;
+  const entities = ((board.entities ?? []) as Array<Record<string, unknown>>).map((e) => e as unknown as SceneEntity);
   const world = (board.world ?? null) as Record<string, any> | null;
 
   return (
@@ -100,14 +120,14 @@ function ScenarioPanel({ scenario, issues }: { scenario: Scenario; issues: Board
         </div>
       )}
 
-      <NPCDialogue scenarioId={scenario.id} board={board} />
+      <NPCDialogue scenarioId={scenario.id} board={board} selectedNpcId={selectedNpcId} onSelectNpc={onSelectNpc} />
 
       <ValidationReport issues={issues} />
 
       <div>
         <h3 className="text-lg font-semibold mb-2">3D Scene (lazy loaded)</h3>
         <Suspense fallback={<div className="h-[60vh] rounded-lg bg-slate-900 animate-pulse" />}>
-          <Scene3D />
+          <Scene3D entities={entities} selectedNpcId={selectedNpcId} onSelectNpc={onSelectNpc} />
         </Suspense>
       </div>
     </div>
