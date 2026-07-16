@@ -127,7 +127,7 @@ function ScenarioPanel({
       <div>
         <h3 className="text-lg font-semibold mb-2">3D Scene (lazy loaded)</h3>
         <Suspense fallback={<div className="h-[60vh] rounded-lg bg-slate-900 animate-pulse" />}>
-          <Scene3D entities={entities} selectedNpcId={selectedNpcId} onSelectNpc={onSelectNpc} />
+          <Scene3D entities={entities} selectedNpcId={selectedNpcId} onSelectNpc={onSelectNpc} hour={simulation.hour} />
         </Suspense>
       </div>
     </div>
