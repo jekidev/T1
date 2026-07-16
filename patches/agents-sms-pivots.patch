@@ -1,8 +1,8 @@
 diff --git a/src/index.ts b/src/index.ts
-index ca38010..7a2ffc4 100644
+index ca38010..8c34397 100644
 --- a/src/index.ts
 +++ b/src/index.ts
-@@ -11,6 +11,50 @@ import { SmsProvider } from "./types";
+@@ -11,6 +11,58 @@ import { SmsProvider } from "./types";
  import { initProviders, getProviderByName, findCheapestProvider } from "./providers";
  
  let providers: SmsProvider[] = [];
@@ -12,6 +12,14 @@ index ca38010..7a2ffc4 100644
 +
 +function smsCacheKey(providerName: string, numberId: string): string {
 +  return `${providerName}:${numberId}`;
++}
++
++// In-memory cache for list_services to avoid repeated provider price lookups.
++const servicesCache = new Map<string, { services: any[]; total: number; at: number }>();
++const SERVICES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
++
++function servicesCacheKey(country: string, search?: string): string {
++  return `${country}:${search || "*"}`;
 +}
 +
 +// Redact configured API keys from any text before it is returned or logged.
@@ -53,7 +61,7 @@ index ca38010..7a2ffc4 100644
  
  function createMcpServer(): McpServer {
    const server = new McpServer({ name: "mcp-sms-server", version: "1.0.0" });
-@@ -39,7 +83,7 @@ function createMcpServer(): McpServer {
+@@ -39,7 +91,7 @@ function createMcpServer(): McpServer {
              content: [
                {
                  type: "text" as const,
@@ -62,7 +70,7 @@ index ca38010..7a2ffc4 100644
                    error: `Provider '${preferredProvider}' not found. Available: ${providers.map((p) => p.name).join(", ")}`,
                  }),
                },
-@@ -56,7 +100,7 @@ function createMcpServer(): McpServer {
+@@ -56,7 +108,7 @@ function createMcpServer(): McpServer {
              content: [
                {
                  type: "text" as const,
@@ -71,7 +79,7 @@ index ca38010..7a2ffc4 100644
                    error: `Service '${service}' not available in country '${country}' from any provider.`,
                  }),
                },
-@@ -75,7 +119,7 @@ function createMcpServer(): McpServer {
+@@ -75,7 +127,7 @@ function createMcpServer(): McpServer {
              content: [
                {
                  type: "text" as const,
@@ -80,7 +88,7 @@ index ca38010..7a2ffc4 100644
                    number_id: result.number_id,
                    phone_number: result.phone_number,
                    provider: selectedProvider.name,
-@@ -94,7 +138,7 @@ function createMcpServer(): McpServer {
+@@ -94,7 +146,7 @@ function createMcpServer(): McpServer {
          content: [
            {
              type: "text" as const,
@@ -89,7 +97,7 @@ index ca38010..7a2ffc4 100644
            },
          ],
        };
-@@ -118,19 +162,34 @@ function createMcpServer(): McpServer {
+@@ -118,19 +170,34 @@ function createMcpServer(): McpServer {
            content: [
              {
                type: "text" as const,
@@ -126,7 +134,7 @@ index ca38010..7a2ffc4 100644
            },
          ],
        };
-@@ -154,7 +213,7 @@ function createMcpServer(): McpServer {
+@@ -154,7 +221,7 @@ function createMcpServer(): McpServer {
            content: [
              {
                type: "text" as const,
@@ -135,7 +143,7 @@ index ca38010..7a2ffc4 100644
              },
            ],
          };
-@@ -166,7 +225,7 @@ function createMcpServer(): McpServer {
+@@ -166,7 +233,7 @@ function createMcpServer(): McpServer {
          content: [
            {
              type: "text" as const,
@@ -144,16 +152,44 @@ index ca38010..7a2ffc4 100644
            },
          ],
        };
-@@ -220,7 +279,7 @@ function createMcpServer(): McpServer {
+@@ -184,6 +251,20 @@ function createMcpServer(): McpServer {
+       search: z.string().optional().describe("Search/filter service name"),
+     },
+     async ({ country, search }) => {
++      const key = servicesCacheKey(country, search);
++      const now = Date.now();
++      const cached = servicesCache.get(key);
++      if (cached && now - cached.at < SERVICES_CACHE_TTL_MS) {
++        return {
++          content: [
++            {
++              type: "text" as const,
++              text: safeJson({ services: cached.services, total: cached.total }),
++            },
++          ],
++        };
++      }
++
+       const allServices = await Promise.allSettled(
+         providers.map((p) => p.getServices(country))
+       );
+@@ -215,12 +296,14 @@ function createMcpServer(): McpServer {
+       const services = Array.from(serviceMap.values())
+         .sort((a, b) => a.service.localeCompare(b.service))
+         .slice(0, 50);
++      const total = serviceMap.size;
++      servicesCache.set(key, { services, total, at: now });
+ 
+       return {
          content: [
            {
              type: "text" as const,
 -            text: JSON.stringify({ services, total: serviceMap.size }),
-+            text: safeJson({ services, total: serviceMap.size }),
++            text: safeJson({ services, total }),
            },
          ],
        };
-@@ -249,7 +308,7 @@ function createMcpServer(): McpServer {
+@@ -249,7 +332,7 @@ function createMcpServer(): McpServer {
          content: [
            {
              type: "text" as const,
@@ -162,7 +198,7 @@ index ca38010..7a2ffc4 100644
            },
          ],
        };
-@@ -272,7 +331,7 @@ function createMcpServer(): McpServer {
+@@ -272,7 +355,7 @@ function createMcpServer(): McpServer {
            content: [
              {
                type: "text" as const,
@@ -171,7 +207,7 @@ index ca38010..7a2ffc4 100644
                  error: "BACKEND_API_URL and MCP_SMS_API_KEY must be set in .env",
                }),
              },
-@@ -289,7 +348,7 @@ function createMcpServer(): McpServer {
+@@ -289,7 +372,7 @@ function createMcpServer(): McpServer {
            content: [
              {
                type: "text" as const,
@@ -180,7 +216,7 @@ index ca38010..7a2ffc4 100644
              },
            ],
          };
-@@ -301,7 +360,7 @@ function createMcpServer(): McpServer {
+@@ -301,7 +384,7 @@ function createMcpServer(): McpServer {
          content: [
            {
              type: "text" as const,
@@ -189,7 +225,7 @@ index ca38010..7a2ffc4 100644
                balance_usd: data.balance_usd,
                low_balance: data.balance_usd < 1.0,
                message:
-@@ -340,7 +399,7 @@ function createMcpServer(): McpServer {
+@@ -340,7 +423,7 @@ function createMcpServer(): McpServer {
            content: [
              {
                type: "text" as const,
@@ -198,7 +234,7 @@ index ca38010..7a2ffc4 100644
              },
            ],
          };
-@@ -367,7 +426,7 @@ function createMcpServer(): McpServer {
+@@ -367,7 +450,7 @@ function createMcpServer(): McpServer {
            content: [
              {
                type: "text" as const,
@@ -207,7 +243,7 @@ index ca38010..7a2ffc4 100644
              },
            ],
          };
-@@ -379,7 +438,7 @@ function createMcpServer(): McpServer {
+@@ -379,7 +462,7 @@ function createMcpServer(): McpServer {
          content: [
            {
              type: "text" as const,

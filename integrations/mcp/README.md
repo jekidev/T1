@@ -58,6 +58,7 @@ It is patched by T1 to:
 
 - Cache `findCheapestProvider` price lookups for 5 minutes, so consecutive `buy_number` calls for the same service/country are fast.
 - Cache `get_sms` status responses for 5 seconds, reducing provider polling.
+- Cache `list_services` results for 5 minutes by country/search, so price browsing is fast and avoids repeated provider API calls.
 - Redact configured provider API keys from all tool output and stderr logs.
 - Start successfully even when no provider keys are set, returning an empty provider list for smoke tests.
 
