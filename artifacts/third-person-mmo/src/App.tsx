@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { fetchScenarios, fetchScenario, type Scenario } from './lib/api';
+import { validateBoardMapping, type BoardMappingIssue } from './lib/validateBoardMapping';
+
+const Scene3D = lazy(() => import('./components/Scene3D'));
 
 export default function App() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<BoardMappingIssue[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -15,6 +19,7 @@ export default function App() {
         }
         const first = await fetchScenario(scenarios[0].id);
         setScenario(first);
+        setIssues(validateBoardMapping((first.board ?? {}) as Record<string, unknown>));
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -27,12 +32,12 @@ export default function App() {
       <h1 className="text-2xl font-bold mb-4">T1 Third-Person MMO RPG</h1>
       {error && <p className="text-red-400">Error: {error}</p>}
       {!scenario && !error && <p>Loading scenario...</p>}
-      {scenario && <ScenarioPanel scenario={scenario} />}
+      {scenario && <ScenarioPanel scenario={scenario} issues={issues} />}
     </div>
   );
 }
 
-function ScenarioPanel({ scenario }: { scenario: Scenario }) {
+function ScenarioPanel({ scenario, issues }: { scenario: Scenario; issues: BoardMappingIssue[] }) {
   const board = (scenario.board ?? {}) as Record<string, any>;
   const simulation = (board.simulation ?? {}) as Record<string, any>;
   const factions = (simulation.factions ?? []) as Array<Record<string, any>>;
@@ -78,6 +83,37 @@ function ScenarioPanel({ scenario }: { scenario: Scenario }) {
           World: {world.city}, {world.country} — map provider {world.mapProvider}
         </div>
       )}
+
+      <ValidationReport issues={issues} />
+
+      <div>
+        <h3 className="text-lg font-semibold mb-2">3D Scene (lazy loaded)</h3>
+        <Suspense fallback={<div className="h-[60vh] rounded-lg bg-slate-900 animate-pulse" />}>
+          <Scene3D />
+        </Suspense>
+      </div>
+    </div>
+  );
+}
+
+function ValidationReport({ issues }: { issues: BoardMappingIssue[] }) {
+  if (issues.length === 0) {
+    return <p className="text-green-400 text-sm">Board mapping validation passed.</p>;
+  }
+  const errors = issues.filter((i) => i.severity === 'error');
+  const warnings = issues.filter((i) => i.severity === 'warning');
+  return (
+    <div className="bg-slate-800 p-4 rounded">
+      <h3 className="text-lg font-semibold mb-2">
+        Board Mapping Validation — {errors.length} error(s), {warnings.length} warning(s)
+      </h3>
+      <ul className="space-y-1 max-h-60 overflow-auto">
+        {issues.map((issue, index) => (
+          <li key={index} className={`text-sm ${issue.severity === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>
+            <span className="font-mono">{issue.path}</span> — {issue.message}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

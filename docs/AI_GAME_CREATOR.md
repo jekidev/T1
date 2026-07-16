@@ -17,7 +17,7 @@ This repository is ready for an external AI game creator (Manus, Replit Agent, C
 | `artifacts/api-server` | Express backend; scenarios, snapshots, advisor chat, knowledge query. | yes |
 | `artifacts/command-sim` | React board UI + `src/lib/game` simulation library. | yes |
 | `artifacts/mockup-sandbox` | Mockup playground. | yes |
-| `artifacts/third-person-mmo` | **Your new game client scaffold** (empty, ready). | no |
+| `artifacts/third-person-mmo` | **Your new game client scaffold** with React + Vite + Tailwind v4 + lazy Three.js scene + board mapping validation. | no |
 | `lib/api-zod`, `lib/db` | Shared schema and database utilities. | yes |
 | `knowledge/` | RAG documents and indexes for world-building. | yes (read, don't modify without approval) |
 | `scripts/` | Setup, RAG sync, knowledge indexing. | yes |
@@ -45,11 +45,30 @@ Add all new third-person MMO RPG code under `artifacts/third-person-mmo/`. The e
 - `index.html` — entry point.
 - `vite.config.ts` — Vite + React + Tailwind v4, API proxy configured.
 - `src/main.tsx` — React root.
-- `src/App.tsx` — minimal fetch example that loads the first scenario and shows `SimulationState`.
+- `src/App.tsx` — minimal fetch example that loads the first scenario, validates board mapping, and shows `SimulationState`.
 - `src/index.css` — Tailwind v4 import.
 - `src/lib/api.ts` — example `fetch` helpers for the T1 API.
+- `src/lib/validateBoardMapping.ts` — checks whether a `BoardState` has the fields an MMO client needs.
+- `src/components/Scene3D.tsx` — lazy-loaded Three.js placeholder scene.
 
-You may add any libraries the workspace catalog already supports (`three`, `@react-three/fiber`, `babylonjs`, etc.) by adding them to `artifacts/third-person-mmo/package.json` and running `pnpm install`.
+You may add any libraries the workspace catalog already supports (`three`, `@react-three/fiber`, `babylonjs`, etc.) by adding them to `artifacts/third-person-mmo/package.json` and running `pnpm install`. The scaffold already uses `three` directly via dynamic import, so React 19 compatibility is not tied to any wrapper version.
+
+## Recommended 3D stack
+
+The scaffold uses **vanilla Three.js** loaded lazily:
+
+- `three@^0.170.0` and `@types/three@^0.170.0` are already installed.
+- `Scene3D.tsx` is imported with `React.lazy`, so Three.js only loads when the 3D view is rendered.
+- `vite.config.ts` splits `three` and `vendor` (react/react-dom) into separate chunks for faster first paint.
+
+This choice is intentionally framework-agnostic. You can later replace the placeholder `Scene3D` with:
+- a real third-person camera rig,
+- instanced NPC meshes populated from `board.entities`,
+- ground tiles derived from `board.zones`,
+- directional lighting driven by `board.world.time` / `SimulationState.hour`,
+- quest markers spawned from `board.timelineEvents`.
+
+The same pattern works for `@react-three/fiber` or Babylon.js if you prefer — just swap the lazy component and add the dependency.
 
 ## Data sources you can use
 
@@ -129,6 +148,7 @@ See `artifacts/third-person-mmo/src/App.tsx` for a working minimal example.
 3. Preserve the `pnpm` workspace and `artifacts/api-server` contract.
 4. If you add new API routes, run `pnpm typecheck` and `pnpm build` from the repo root.
 5. All scenarios and world events must remain fictional and game-context only, even when using realistic RAG source material.
+6. Read `docs/MMO_SECURITY_REVIEW.md` before sending RAG text or advisor messages from the MMO client — RAG snippets must be framed as user-facing background, never as system instructions.
 
 ## Testing
 
@@ -151,3 +171,5 @@ Before committing, run `python scripts/knowledge_validate.py` if you changed any
 - `artifacts/api-server/src/routes/scenarios.ts` — HTTP contract for scenarios.
 - `artifacts/api-server/src/routes/advisor.ts` — HTTP contract for advisor.
 - `artifacts/api-server/src/routes/knowledge.ts` — HTTP contract for knowledge query.
+- `docs/MMO_SECURITY_REVIEW.md` — security rules for the MMO data flow.
+- `artifacts/third-person-mmo/src/lib/safeRag.ts` — helper for safely formatting RAG snippets.
