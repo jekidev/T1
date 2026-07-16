@@ -18,19 +18,47 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       // An exposed Devin tunnel may embed basic-auth credentials in the URL.
-      // Browsers block in-page fetch() for relative URLs when the document's
-      // base URL contains credentials. Reload once to the same URL without
-      // credentials so the browser can use its cached basic-auth token for all
-      // subsequent API calls without showing a login prompt.
+      // Browsers block fetch() when a request URL contains credentials, so we
+      // capture the token from the document's base URL and attach it as a
+      // standard Authorization header to same-origin API calls instead.
       (function () {
         try {
-          const url = new URL(document.baseURI || window.location.href);
-          if (url.username || url.password) {
-            url.username = '';
-            url.password = '';
-            window.location.replace(url.toString());
+          const base = new URL(document.baseURI || window.location.href);
+          if (base.username || base.password) {
+            window.__DEVIN_BASIC_AUTH__ =
+              'Basic ' + btoa(unescape(encodeURIComponent(base.username + ':' + base.password)));
           }
         } catch {}
+
+        const originalFetch = window.fetch;
+        window.fetch = function (input, init) {
+          if (!window.__DEVIN_BASIC_AUTH__) return originalFetch(input, init);
+          try {
+            const urlStr =
+              typeof input === 'string'
+                ? input
+                : input instanceof URL
+                  ? input.toString()
+                  : input.url;
+            if (typeof urlStr !== 'string') return originalFetch(input, init);
+
+            const base = new URL(document.baseURI || window.location.href);
+            const req = new URL(urlStr, base.toString());
+            if (req.origin === base.origin) {
+              const clean = new URL(req.toString());
+              clean.username = '';
+              clean.password = '';
+              init = init || {};
+              const headers = new Headers(init.headers);
+              if (!headers.has('authorization')) {
+                headers.set('authorization', window.__DEVIN_BASIC_AUTH__);
+              }
+              init = { ...init, headers };
+              return originalFetch(clean.toString(), init);
+            }
+          } catch {}
+          return originalFetch(input, init);
+        };
       })();
     </script>
   </head>
