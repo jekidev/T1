@@ -18,6 +18,12 @@ const vendors = [
     branch: 'master',
     required: true,
   },
+  {
+    name: 'discord-mcp',
+    repository: 'https://github.com/SaseQ/discord-mcp.git',
+    branch: 'main',
+    required: true,
+  },
 ];
 
 function run(command, args, cwd = root) {
