@@ -4,11 +4,12 @@
   "safe": {
     "source": "safe-index.jsonl",
     "canonical": "safe-index-canonical.jsonl",
-    "canonical_rows": 532
+    "canonical_rows": 787
   },
   "quarantine": {
     "source": "quarantine-index.jsonl",
     "canonical": "quarantine-index-canonical.jsonl",
-    "canonical_rows": 255
-  }
+    "canonical_rows": 0
+  },
+  "moved_from_quarantine": 466
 }
