@@ -43,8 +43,25 @@ This clones:
 
 - `chigwell/telegram-mcp` into `integrations/vendor/telegram-mcp`
 - `megahomyak/tg_auth_api` into `integrations/vendor/tg_auth_api`
+- `SaseQ/discord-mcp` into `integrations/vendor/discord-mcp`
 
 The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_URL`. Its exact startup command and endpoint names may differ by revision; configure or adapt the proxy before production use. Secrets and Telegram session strings must remain in the hosting platform secret store.
+
+### Discord MCP
+
+Install or update the vendor checkout with:
+
+```bash
+pnpm setup:mcp
+```
+
+Discord MCP runs as a shared HTTP service on `http://localhost:8085/mcp`. Start it with Docker Compose from `integrations/vendor/discord-mcp` after supplying `DISCORD_TOKEN` and, optionally, `DISCORD_GUILD_ID` in the platform secret store:
+
+```bash
+SPRING_PROFILES_ACTIVE=http docker compose up -d --build
+```
+
+The T1 registry exposes Discord as disabled by default and requires approval for all write or moderation capabilities. Do not commit the Discord bot token.
 
 ## Telegram modify mode
 

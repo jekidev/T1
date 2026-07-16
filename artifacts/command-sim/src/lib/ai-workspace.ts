@@ -46,6 +46,7 @@ const DEFAULT_MCP_SERVERS: McpServerDefinition[] = [
   { id: 'playwright', name: 'Playwright MCP', transport: 'stdio', enabled: false, capabilities: ['browser.navigate', 'browser.inspect', 'browser.screenshot', 'browser.interact'], requiresApprovalForWrites: true },
   { id: 'telegram-auth', name: 'Telegram Auth API', transport: 'http', enabled: false, capabilities: ['telegram.auth.start', 'telegram.auth.verify', 'telegram.auth.status', 'telegram.auth.logout'], requiresApprovalForWrites: true },
   { id: 'telegram', name: 'Telegram MCP', transport: 'stdio', enabled: false, capabilities: ['telegram.chats.read', 'telegram.messages.read', 'telegram.search', 'telegram.messages.send', 'telegram.messages.edit', 'telegram.messages.delete', 'telegram.messages.forward', 'telegram.groups.manage'], requiresApprovalForWrites: true },
+  { id: 'discord', name: 'Discord MCP', transport: 'http', endpoint: 'http://localhost:8085/mcp', enabled: false, capabilities: ['discord.server.read', 'discord.channels.read', 'discord.messages.read', 'discord.messages.send', 'discord.channels.manage', 'discord.roles.manage', 'discord.moderation'], requiresApprovalForWrites: true },
   { id: 'rsshub', name: 'RSSHub', transport: 'http', enabled: false, capabilities: ['rss.fetch', 'rss.search'], requiresApprovalForWrites: false },
 ];
 
