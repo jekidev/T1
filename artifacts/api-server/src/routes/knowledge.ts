@@ -30,7 +30,8 @@ function isString(value: unknown): value is string {
 }
 
 function tokenize(input: string): string[] {
-  return (input.match(/[\wæøåÆØÅ-]+/g) ?? [])
+  const matches = (input.match(/[\wæøåÆØÅ-]+/g) ?? []) as string[];
+  return matches
     .filter((t) => t.length > 1)
     .map((t) => t.toLowerCase());
 }
