@@ -3,6 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./lib/game/simulationEngine": {
+      "types": "./src/lib/game/simulationEngine.ts",
+      "workspace": "./src/lib/game/simulationEngine.ts",
+      "default": "./src/lib/game/simulationEngine.ts"
+    },
+    "./lib/game/narrativeEngine": {
+      "types": "./src/lib/game/narrativeEngine.ts",
+      "workspace": "./src/lib/game/narrativeEngine.ts",
+      "default": "./src/lib/game/narrativeEngine.ts"
+    },
+    "./lib/game/types": {
+      "types": "./src/lib/game/types.ts",
+      "workspace": "./src/lib/game/types.ts",
+      "default": "./src/lib/game/types.ts"
+    }
+  },
+  "dependencies": {
+    "nanoid": "^6.0.0"
+  },
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
@@ -57,7 +77,6 @@
     "framer-motion": "catalog:",
     "input-otp": "^1.4.2",
     "lucide-react": "catalog:",
-    "nanoid": "^6.0.0",
     "next-themes": "^0.4.6",
     "react": "catalog:",
     "react-day-picker": "^9.11.1",

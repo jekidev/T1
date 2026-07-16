@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import NPCDialogue from './components/NPCDialogue';
 import { useScenario, useScenarios } from './hooks/useScenarios';
+import type { Scenario } from './lib/api';
 import { validateBoardMapping, type BoardMappingIssue } from './lib/validateBoardMapping';
 
 const Scene3D = lazy(() => import('./components/Scene3D'));
@@ -51,7 +53,7 @@ export default function App() {
   );
 }
 
-function ScenarioPanel({ scenario, issues }: { scenario: { name: string; description: string | null; board: unknown }; issues: BoardMappingIssue[] }) {
+function ScenarioPanel({ scenario, issues }: { scenario: Scenario; issues: BoardMappingIssue[] }) {
   const board = (scenario.board ?? {}) as Record<string, any>;
   const simulation = (board.simulation ?? {}) as Record<string, any>;
   const factions = (simulation.factions ?? []) as Array<Record<string, any>>;
@@ -97,6 +99,8 @@ function ScenarioPanel({ scenario, issues }: { scenario: { name: string; descrip
           World: {world.city}, {world.country} — map provider {world.mapProvider}
         </div>
       )}
+
+      <NPCDialogue scenarioId={scenario.id} board={board} />
 
       <ValidationReport issues={issues} />
 

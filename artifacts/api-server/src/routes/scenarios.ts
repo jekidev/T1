@@ -4,8 +4,31 @@ import {
   CreateScenarioBody,
   UpdateScenarioBody,
 } from "@workspace/api-zod";
+import type { BoardState } from "@workspace/command-sim/lib/game/types";
+import {
+  simulateTurn,
+  type PlayerTurnAction,
+} from "@workspace/command-sim/lib/game/simulationEngine";
 
 const router: IRouter = Router();
+const ALLOWED_ACTIONS = [
+  "invest",
+  "gather_intelligence",
+  "reduce_pressure",
+  "expand_influence",
+  "train",
+  "wait",
+];
+
+function isValidAction(body: unknown): body is PlayerTurnAction {
+  if (!body || typeof body !== "object") return false;
+  const action = body as Record<string, unknown>;
+  if (typeof action.type !== "string" || !ALLOWED_ACTIONS.includes(action.type)) return false;
+  if (action.factionId !== undefined && typeof action.factionId !== "string") return false;
+  if (action.skillId !== undefined && typeof action.skillId !== "string") return false;
+  if (action.amount !== undefined && typeof action.amount !== "number") return false;
+  return true;
+}
 
 router.get("/scenarios", async (req, res) => {
   const rows = await db
@@ -68,6 +91,30 @@ router.patch("/scenarios/:id", async (req, res): Promise<void> => {
     return;
   }
   res.json(row);
+});
+
+router.post("/scenarios/:id/resolve", async (req, res): Promise<void> => {
+  const id = Number(req.params["id"]);
+  const [row] = await db
+    .select()
+    .from(scenariosTable)
+    .where(eq(scenariosTable.id, id));
+  if (!row) {
+    res.status(404).json({ message: "Scenario not found" });
+    return;
+  }
+  const action = isValidAction(req.body) ? req.body : undefined;
+  const board = row.board as BoardState;
+  const resolution = simulateTurn(board, action);
+  const [updated] = await db
+    .update(scenariosTable)
+    .set({
+      board: resolution.board,
+      updatedAt: new Date(),
+    })
+    .where(eq(scenariosTable.id, id))
+    .returning();
+  res.json({ ...resolution, scenario: updated });
 });
 
 router.delete("/scenarios/:id", async (req, res): Promise<void> => {
