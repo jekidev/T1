@@ -10,3 +10,5 @@
 8. Run `python scripts/knowledge_validate.py` before commit.
 9. State what changed, why, source IDs used, and validation results in the commit or PR.
 10. Do not delete duplicates; record their relationship and select a canonical retrieval record.
+11. **Never delete or overwrite any file, source artifact, or index without first asking the user and receiving explicit approval.**
+12. **Always mention anything that is placed in quarantine** — state what, why (risk tier), where it is stored, and how it can be reviewed.
