@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "three": "^0.170.0"

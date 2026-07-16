@@ -1,43 +1,57 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { fetchScenarios, fetchScenario, type Scenario } from './lib/api';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { useScenario, useScenarios } from './hooks/useScenarios';
 import { validateBoardMapping, type BoardMappingIssue } from './lib/validateBoardMapping';
 
 const Scene3D = lazy(() => import('./components/Scene3D'));
 
 export default function App() {
-  const [scenario, setScenario] = useState<Scenario | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [issues, setIssues] = useState<BoardMappingIssue[]>([]);
+  const { data: scenarios, isLoading: scenariosLoading, error: scenariosError } = useScenarios();
+  const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const scenarios = await fetchScenarios();
-        if (scenarios.length === 0) {
-          setError('No scenarios found. Create one in command-sim or POST to /api/scenarios first.');
-          return;
-        }
-        const first = await fetchScenario(scenarios[0].id);
-        setScenario(first);
-        setIssues(validateBoardMapping((first.board ?? {}) as Record<string, unknown>));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      }
+    if (scenarios && scenarios.length > 0 && selectedId === undefined) {
+      setSelectedId(scenarios[0].id);
     }
-    load();
-  }, []);
+  }, [scenarios, selectedId]);
+
+  const { data: scenario, isLoading: scenarioLoading, error: scenarioError } = useScenario(selectedId);
+
+  const issues = useMemo<BoardMappingIssue[]>(() => {
+    if (!scenario) return [];
+    return validateBoardMapping((scenario.board ?? {}) as Record<string, unknown>);
+  }, [scenario]);
+
+  const error = scenariosError?.message ?? scenarioError?.message ?? null;
+  const loading = scenariosLoading || scenarioLoading;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <h1 className="text-2xl font-bold mb-4">T1 Third-Person MMO RPG</h1>
       {error && <p className="text-red-400">Error: {error}</p>}
-      {!scenario && !error && <p>Loading scenario...</p>}
+      {loading && !scenario && <p>Loading scenario...</p>}
+      {scenarios && scenarios.length === 0 && (
+        <p className="text-yellow-400">No scenarios found. Create one in command-sim or POST to /api/scenarios first.</p>
+      )}
+      {scenarios && scenarios.length > 0 && (
+        <div className="mb-4">
+          <label className="mr-2 text-slate-400">Scenario:</label>
+          <select
+            className="bg-slate-800 text-slate-100 rounded px-3 py-1"
+            value={selectedId ?? ''}
+            onChange={(e) => setSelectedId(Number(e.target.value))}
+          >
+            {scenarios.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {scenario && <ScenarioPanel scenario={scenario} issues={issues} />}
     </div>
   );
 }
 
-function ScenarioPanel({ scenario, issues }: { scenario: Scenario; issues: BoardMappingIssue[] }) {
+function ScenarioPanel({ scenario, issues }: { scenario: { name: string; description: string | null; board: unknown }; issues: BoardMappingIssue[] }) {
   const board = (scenario.board ?? {}) as Record<string, any>;
   const simulation = (board.simulation ?? {}) as Record<string, any>;
   const factions = (simulation.factions ?? []) as Array<Record<string, any>>;

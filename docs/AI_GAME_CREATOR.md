@@ -172,4 +172,5 @@ Before committing, run `python scripts/knowledge_validate.py` if you changed any
 - `artifacts/api-server/src/routes/advisor.ts` — HTTP contract for advisor.
 - `artifacts/api-server/src/routes/knowledge.ts` — HTTP contract for knowledge query.
 - `docs/MMO_SECURITY_REVIEW.md` — security rules for the MMO data flow.
+- `docs/MMO_THREEJS_ROADMAP.md` — concrete step-by-step roadmap for building the third-person view with vanilla Three.js.
 - `artifacts/third-person-mmo/src/lib/safeRag.ts` — helper for safely formatting RAG snippets.

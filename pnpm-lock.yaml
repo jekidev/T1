@@ -602,6 +602,9 @@ importers:
 
   artifacts/third-person-mmo:
     dependencies:
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.101.2(react@19.1.0)
       react:
         specifier: 'catalog:'
         version: 19.1.0

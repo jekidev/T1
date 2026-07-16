@@ -32,4 +32,4 @@ Make sure the API server is running first (`pnpm dev` from root starts it on por
 6. Call `/api/advisor/chat` for NPC dialogue and `/api/knowledge/query` for world lore.
 7. Add server-authoritative turn resolution by exposing `simulateTurn` in `artifacts/api-server/src/routes`.
 
-See `docs/AI_GAME_CREATOR.md` and `docs/T1_SIMULATION_CONTRACT.md` for the full design contract.
+See `docs/AI_GAME_CREATOR.md` and `docs/T1_SIMULATION_CONTRACT.md` for the full design contract. For a concrete step-by-step Three.js build plan, read `docs/MMO_THREEJS_ROADMAP.md`.
