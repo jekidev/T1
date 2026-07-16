@@ -29,7 +29,7 @@ const vendors = [
     repository: 'https://github.com/gonchasobaka/agents-sms.git',
     branch: 'main',
     required: true,
-    patch: path.join(root, 'patches', 'agents-sms-cache.patch'),
+    patch: path.join(root, 'patches', 'agents-sms-pivots.patch'),
     build: [
       ['npm', ['install', '--ignore-scripts']],
       ['node', ['node_modules/esbuild/bin/esbuild', 'src/index.ts', '--bundle', '--platform=node', '--outfile=dist/index.js', '--format=cjs']],

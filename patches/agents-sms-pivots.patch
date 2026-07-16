@@ -1,0 +1,280 @@
+diff --git a/src/index.ts b/src/index.ts
+index ca38010..7a2ffc4 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -11,6 +11,50 @@ import { SmsProvider } from "./types";
+ import { initProviders, getProviderByName, findCheapestProvider } from "./providers";
+ 
+ let providers: SmsProvider[] = [];
++// In-memory SMS status cache for get_sms to avoid hammering provider APIs.
++const smsCache = new Map<string, { result: any; at: number }>();
++const SMS_CACHE_TTL_MS = 5 * 1000; // 5 seconds
++
++function smsCacheKey(providerName: string, numberId: string): string {
++  return `${providerName}:${numberId}`;
++}
++
++// Redact configured API keys from any text before it is returned or logged.
++function getSecretValues(): string[] {
++  const keys = [
++    process.env.FIVESIM_API_KEY,
++    process.env.SMSACTIVATE_API_KEY,
++    process.env.ONLINESIM_API_KEY,
++  ].filter((v): v is string => typeof v === "string" && v.length >= 4);
++  return keys;
++}
++
++function redactSecrets(text: string): string {
++  const secrets = getSecretValues();
++  if (secrets.length === 0) return text;
++  secrets.sort((a, b) => b.length - a.length);
++  let out = text;
++  for (const secret of secrets) {
++    out = out.replaceAll(secret, "[REDACTED]");
++  }
++  return out;
++}
++
++function safeJson(value: unknown): string {
++  return redactSecrets(JSON.stringify(value));
++}
++
++// Wrap stderr writes so fatal and debug logs never leak API keys.
++const originalStderrWrite = process.stderr.write.bind(process.stderr);
++process.stderr.write = (
++  chunk: any,
++  encoding?: any,
++  cb?: any
++) => {
++  const raw = typeof chunk === "string" ? chunk : Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
++  return originalStderrWrite(redactSecrets(raw), encoding, cb);
++};
++
+ 
+ function createMcpServer(): McpServer {
+   const server = new McpServer({ name: "mcp-sms-server", version: "1.0.0" });
+@@ -39,7 +83,7 @@ function createMcpServer(): McpServer {
+             content: [
+               {
+                 type: "text" as const,
+-                text: JSON.stringify({
++                text: safeJson({
+                   error: `Provider '${preferredProvider}' not found. Available: ${providers.map((p) => p.name).join(", ")}`,
+                 }),
+               },
+@@ -56,7 +100,7 @@ function createMcpServer(): McpServer {
+             content: [
+               {
+                 type: "text" as const,
+-                text: JSON.stringify({
++                text: safeJson({
+                   error: `Service '${service}' not available in country '${country}' from any provider.`,
+                 }),
+               },
+@@ -75,7 +119,7 @@ function createMcpServer(): McpServer {
+             content: [
+               {
+                 type: "text" as const,
+-                text: JSON.stringify({
++                text: safeJson({
+                   number_id: result.number_id,
+                   phone_number: result.phone_number,
+                   provider: selectedProvider.name,
+@@ -94,7 +138,7 @@ function createMcpServer(): McpServer {
+         content: [
+           {
+             type: "text" as const,
+-            text: JSON.stringify({ error: "All providers failed", details: errors }),
++            text: safeJson({ error: "All providers failed", details: errors }),
+           },
+         ],
+       };
+@@ -118,19 +162,34 @@ function createMcpServer(): McpServer {
+           content: [
+             {
+               type: "text" as const,
+-              text: JSON.stringify({ error: `Provider '${providerName}' not found` }),
++              text: safeJson({ error: `Provider '${providerName}' not found` }),
++            },
++          ],
++        };
++      }
++
++      const key = smsCacheKey(providerName, number_id);
++      const now = Date.now();
++      const cached = smsCache.get(key);
++      if (cached && now - cached.at < SMS_CACHE_TTL_MS) {
++        return {
++          content: [
++            {
++              type: "text" as const,
++              text: safeJson(cached.result),
+             },
+           ],
+         };
+       }
+ 
+       const result = await p.getSms(number_id);
++      smsCache.set(key, { result, at: now });
+ 
+       return {
+         content: [
+           {
+             type: "text" as const,
+-            text: JSON.stringify(result),
++            text: safeJson(result),
+           },
+         ],
+       };
+@@ -154,7 +213,7 @@ function createMcpServer(): McpServer {
+           content: [
+             {
+               type: "text" as const,
+-              text: JSON.stringify({ error: `Provider '${providerName}' not found` }),
++              text: safeJson({ error: `Provider '${providerName}' not found` }),
+             },
+           ],
+         };
+@@ -166,7 +225,7 @@ function createMcpServer(): McpServer {
+         content: [
+           {
+             type: "text" as const,
+-            text: JSON.stringify({ success: true, message: "Number released" }),
++            text: safeJson({ success: true, message: "Number released" }),
+           },
+         ],
+       };
+@@ -220,7 +279,7 @@ function createMcpServer(): McpServer {
+         content: [
+           {
+             type: "text" as const,
+-            text: JSON.stringify({ services, total: serviceMap.size }),
++            text: safeJson({ services, total: serviceMap.size }),
+           },
+         ],
+       };
+@@ -249,7 +308,7 @@ function createMcpServer(): McpServer {
+         content: [
+           {
+             type: "text" as const,
+-            text: JSON.stringify(result),
++            text: safeJson(result),
+           },
+         ],
+       };
+@@ -272,7 +331,7 @@ function createMcpServer(): McpServer {
+           content: [
+             {
+               type: "text" as const,
+-              text: JSON.stringify({
++              text: safeJson({
+                 error: "BACKEND_API_URL and MCP_SMS_API_KEY must be set in .env",
+               }),
+             },
+@@ -289,7 +348,7 @@ function createMcpServer(): McpServer {
+           content: [
+             {
+               type: "text" as const,
+-              text: JSON.stringify({ error: `API error: ${res.status}` }),
++              text: safeJson({ error: `API error: ${res.status}` }),
+             },
+           ],
+         };
+@@ -301,7 +360,7 @@ function createMcpServer(): McpServer {
+         content: [
+           {
+             type: "text" as const,
+-            text: JSON.stringify({
++            text: safeJson({
+               balance_usd: data.balance_usd,
+               low_balance: data.balance_usd < 1.0,
+               message:
+@@ -340,7 +399,7 @@ function createMcpServer(): McpServer {
+           content: [
+             {
+               type: "text" as const,
+-              text: JSON.stringify({ error: "CRYPTOBOT_TOKEN not set in .env" }),
++              text: safeJson({ error: "CRYPTOBOT_TOKEN not set in .env" }),
+             },
+           ],
+         };
+@@ -367,7 +426,7 @@ function createMcpServer(): McpServer {
+           content: [
+             {
+               type: "text" as const,
+-              text: JSON.stringify({ error: "CryptoBot error", details: data.error }),
++              text: safeJson({ error: "CryptoBot error", details: data.error }),
+             },
+           ],
+         };
+@@ -379,7 +438,7 @@ function createMcpServer(): McpServer {
+         content: [
+           {
+             type: "text" as const,
+-            text: JSON.stringify({
++            text: safeJson({
+               pay_url: invoice.pay_url,
+               amount_usd,
+               currency,
+diff --git a/src/providers/index.ts b/src/providers/index.ts
+index 7c636bf..41a9e01 100644
+--- a/src/providers/index.ts
++++ b/src/providers/index.ts
+@@ -3,6 +3,15 @@ import { FiveSimProvider } from "./fivesim";
+ import { SmsActivateProvider } from "./smsactivate";
+ import { OnlineSimProvider } from "./onlinesim";
+ 
++
++// In-memory price cache for findCheapestProvider to reduce API calls.
++const priceCache = new Map<string, { value: { provider: SmsProvider; price: number } | null; at: number }>();
++const PRICE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
++
++function priceCacheKey(provider: SmsProvider, service: string, country: string): string {
++  return `${provider.name}:${service}:${country}`;
++}
++
+ export async function initProviders(): Promise<SmsProvider[]> {
+   const candidates: SmsProvider[] = [];
+ 
+@@ -17,7 +26,8 @@ export async function initProviders(): Promise<SmsProvider[]> {
+   }
+ 
+   if (candidates.length === 0) {
+-    throw new Error("No SMS provider API keys configured. Set at least one in .env");
++    console.error("[init] No SMS provider API keys configured. Set at least one in .env");
++    return [];
+   }
+ 
+   // Validate each provider by checking balance — filters out invalid API keys
+@@ -42,7 +52,8 @@ export async function initProviders(): Promise<SmsProvider[]> {
+   }
+ 
+   if (validated.length === 0) {
+-    throw new Error("All provider API keys are invalid. Check your .env file.");
++    console.error("[init] All provider API keys are invalid. Check your .env file.");
++    return [];
+   }
+ 
+   return validated;
+@@ -60,11 +71,20 @@ export async function findCheapestProvider(
+   service: string,
+   country: string
+ ): Promise<{ provider: SmsProvider; price: number }[]> {
++  const now = Date.now();
+   const results = await Promise.allSettled(
+     providers.map(async (p) => {
++      const key = priceCacheKey(p, service, country);
++      const cached = priceCache.get(key);
++      if (cached && now - cached.at < PRICE_CACHE_TTL_MS) {
++        return cached.value;
++      }
++
+       const services = await p.getServices(country);
+       const match = services.find((s) => s.service === service && s.count > 0);
+-      return match ? { provider: p, price: match.price_usd } : null;
++      const value = match ? { provider: p, price: match.price_usd } : null;
++      priceCache.set(key, { value, at: now });
++      return value;
+     })
+   );
+ 

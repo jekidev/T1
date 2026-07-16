@@ -54,6 +54,15 @@ The auth repository is treated as an external service behind `TELEGRAM_AUTH_API_
 
 `agents-sms` is a local stdio MCP for buying virtual phone numbers and receiving SMS codes. Set at least one provider key (`FIVESIM_API_KEY`, `SMSACTIVATE_API_KEY`, or `ONLINESIM_API_KEY`) before enabling the server. Purchasing numbers is treated as an approval-required write.
 
+It is patched by T1 to:
+
+- Cache `findCheapestProvider` price lookups for 5 minutes, so consecutive `buy_number` calls for the same service/country are fast.
+- Cache `get_sms` status responses for 5 seconds, reducing provider polling.
+- Redact configured provider API keys from all tool output and stderr logs.
+- Start successfully even when no provider keys are set, returning an empty provider list for smoke tests.
+
+Run the smoke test with `pnpm test:5sim-smoke`.
+
 ## Signal CLI MCP
 
 `signal-cli-mcp` proposes sending Signal messages and creating groups, but nothing is sent without explicit human approval through a local web GUI. It requires a running `signal-cli-rest-api` instance; start it with the `docker-compose.yml` in `integrations/vendor/signal-cli-mcp` and link the device via the QR code endpoint. Set `SIGNAL_ACCOUNT` to the registered E.164 number.
