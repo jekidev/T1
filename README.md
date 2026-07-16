@@ -2,6 +2,8 @@
 
 Canonical repository for direct import into Replit or continued development through Manus.
 
+> **For AI game creators:** this repo is also ready to be used as the simulation/data layer for a **third-person MMO RPG HTML/browser game**. Read [`docs/AI_GAME_CREATOR.md`](docs/AI_GAME_CREATOR.md) and [`docs/T1_SIMULATION_CONTRACT.md`](docs/T1_SIMULATION_CONTRACT.md), then build your client in `artifacts/third-person-mmo/`. Do not delete existing code; add to it.
+
 ## Fast start
 
 Import:

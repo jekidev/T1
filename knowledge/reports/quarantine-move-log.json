@@ -1,0 +1,15 @@
+{
+  "event": "quarantine_to_safe_move",
+  "timestamp": "2026-07-16T14:50:02.101017+00:00",
+  "moved_count": 466,
+  "source_index": "knowledge/rag/quarantine-index.jsonl",
+  "destination_index": "knowledge/rag/safe-index.jsonl",
+  "canonical_destination": "knowledge/rag/safe-index-canonical.jsonl",
+  "reason": "User requested that HackerAI and other RAG documentation files be treated as game-source documentation and returned to default retrieval.",
+  "original_risk_tier_breakdown": {
+    "restricted": 309,
+    "prompt_injection": 40,
+    "restricted_defensive": 117
+  },
+  "note": "Original risk_tier is preserved in the original_risk_tier field on each chunk; source files in knowledge/sources/original/ were not modified."
+}

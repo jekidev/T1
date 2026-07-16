@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm run build && cd ../.. && NODE_ENV=development node --enable-source-maps artifacts/api-server/dist/index.mjs",
+    "dev": "pnpm run build && cd ../.. && node --env-file=.env --enable-source-maps artifacts/api-server/dist/index.mjs",
     "build": "node ./build.mjs",
     "start": "cd ../.. && node --enable-source-maps artifacts/api-server/dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
+    "@workspace/command-sim": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -20,6 +21,7 @@
     "pino-http": "^10.5.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
