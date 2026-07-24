@@ -1,0 +1,142 @@
+name: Graphics Branch Validate
+
+on:
+  push:
+    branches: [feature/graphics-runtime-phase-1]
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: graphics-runtime-phase-1
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/graphics-runtime-phase-1
+          fetch-depth: 0
+
+      - name: Run validation and capture diagnostics
+        id: validate
+        shell: bash
+        run: |
+          set +e
+          mkdir -p docs/ci
+
+          {
+            echo "Node: $(node --version 2>&1)"
+            echo "npm: $(npm --version 2>&1)"
+            corepack enable
+            corepack prepare pnpm@10.13.1 --activate
+            echo "pnpm: $(pnpm --version 2>&1)"
+          } 2>&1 | tee /tmp/graphics-environment.log
+          ENV_CODE=${PIPESTATUS[0]}
+
+          INSTALL_CODE=99
+          TYPECHECK_CODE=99
+          BUILD_CODE=99
+
+          if [ "$ENV_CODE" -eq 0 ]; then
+            pnpm install --no-frozen-lockfile 2>&1 | tee /tmp/graphics-install.log
+            INSTALL_CODE=${PIPESTATUS[0]}
+          else
+            echo "Install skipped because runtime setup failed." | tee /tmp/graphics-install.log
+          fi
+
+          if [ "$INSTALL_CODE" -eq 0 ]; then
+            pnpm typecheck 2>&1 | tee /tmp/graphics-typecheck.log
+            TYPECHECK_CODE=${PIPESTATUS[0]}
+
+            pnpm build 2>&1 | tee /tmp/graphics-build.log
+            BUILD_CODE=${PIPESTATUS[0]}
+          else
+            echo "Typecheck skipped because install failed." | tee /tmp/graphics-typecheck.log
+            echo "Build skipped because install failed." | tee /tmp/graphics-build.log
+          fi
+
+          {
+            echo "# Graphics CI diagnostics"
+            echo
+            echo "Generated: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo
+            echo "- Environment exit code: $ENV_CODE"
+            echo "- Install exit code: $INSTALL_CODE"
+            echo "- Typecheck exit code: $TYPECHECK_CODE"
+            echo "- Build exit code: $BUILD_CODE"
+            echo
+            echo "## Environment"
+            echo '```text'
+            tail -n 100 /tmp/graphics-environment.log
+            echo '```'
+            echo
+            echo "## Install"
+            echo '```text'
+            tail -n 300 /tmp/graphics-install.log
+            echo '```'
+            echo
+            echo "## Typecheck"
+            echo '```text'
+            tail -n 450 /tmp/graphics-typecheck.log
+            echo '```'
+            echo
+            echo "## Build"
+            echo '```text'
+            tail -n 450 /tmp/graphics-build.log
+            echo '```'
+          } > docs/ci/graphics-latest.md
+
+          echo "environment_code=$ENV_CODE" >> "$GITHUB_OUTPUT"
+          echo "install_code=$INSTALL_CODE" >> "$GITHUB_OUTPUT"
+          echo "typecheck_code=$TYPECHECK_CODE" >> "$GITHUB_OUTPUT"
+          echo "build_code=$BUILD_CODE" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics-ci-diagnostics
+          path: |
+            docs/ci/graphics-latest.md
+            pnpm-lock.yaml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Commit diagnostics and lockfile
+        continue-on-error: true
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ci/graphics-latest.md
+          if [ -f pnpm-lock.yaml ]; then
+            git add pnpm-lock.yaml
+          fi
+          if git diff --cached --quiet; then
+            echo "No diagnostic or lockfile changes to commit."
+            exit 0
+          fi
+          git commit -m "Record graphics CI diagnostics"
+          git push origin HEAD:feature/graphics-runtime-phase-1
+
+      - name: Fail when validation failed
+        shell: bash
+        run: |
+          if [ "${{ steps.validate.outputs.environment_code }}" -ne 0 ] || \
+             [ "${{ steps.validate.outputs.install_code }}" -ne 0 ] || \
+             [ "${{ steps.validate.outputs.typecheck_code }}" -ne 0 ] || \
+             [ "${{ steps.validate.outputs.build_code }}" -ne 0 ]; then
+            echo "Graphics validation failed. Download the graphics-ci-diagnostics artifact or read docs/ci/graphics-latest.md."
+            exit 1
+          fi
