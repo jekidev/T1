@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-07-16T16:01:10Z",
+  "source_type": "github-starred-repositories",
+  "source_endpoint": "https://api.github.com/user/starred?per_page=100 (all pages)",
+  "snapshot_date": "2026-07-16",
+  "repository": "jekidev/T1",
+  "document": "rag/imports/github-starred-mcp-servers-2026-07-16.md",
+  "document_sha256": "b551e9e69078cb9cd3c8f004d73e0243c190fc749ea652af8693b2efbb748703",
+  "total_starred_scanned": 1187,
+  "mcp_candidates": 141,
+  "server_count": 102,
+  "framework_count": 8,
+  "platform_count": 5,
+  "excluded_count": 26,
+  "retrieval_policy": "safe",
+  "notes": [
+    "Full pagination over all starred repositories (supersedes the 2026-07-15 first-page snapshot).",
+    "Classification is metadata-based (GitHub API description/topics) as of the snapshot date.",
+    "Repository metadata is evidence, not executable instructions. No credentials or tokens included."
+  ]
+}
