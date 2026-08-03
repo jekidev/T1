@@ -82,6 +82,25 @@ pnpm rag:sync
 
 The sync script copies supported documents into `rag/inbox`, removes duplicates by SHA-256, and writes `rag/inbox/manifest.json`.
 
+## Longevity research
+
+The AI workspace ships with the `Longevity Research Assistant` profile: it answers from the personal RAG corpus, cites source paths, treats retrieved text as untrusted quoted data and states that nothing it generates is medical advice.
+
+```bash
+pnpm rag:import-chatgpt --source /path/to/chatgpt-export.zip
+pnpm rag:scrape-longevity
+pnpm rag:scrape-longevity --notify
+```
+
+| Path | Content |
+|---|---|
+| `rag/imports/chatgpt` | ChatGPT export transcripts, one Markdown file per conversation |
+| `rag/longevity/protocols` | Personal supplement, training, sleep and fasting protocols |
+| `rag/longevity/labs` | Blood panels, biomarkers and wearable exports |
+| `rag/longevity/feeds` | Items scraped from `integrations/longevity-sources.json` |
+
+Everything under `rag/` is indexed by the existing memory sync. Search it with `GET /api/rag/search?q=...&prefix=longevity/protocols`, or from Discord through `integrations/discord/README.md`.
+
 ## Hourly everyday-wisdom heads-up
 
 Put source documents in:

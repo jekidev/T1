@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "outputDir": "rag/longevity/feeds",
+  "defaultMaxItems": 20,
+  "userAgent": "T1-longevity-research/1.0 (+https://github.com/jekidev/T1)",
+  "sources": [
+    {
+      "id": "pubmed-longevity",
+      "name": "PubMed: human longevity and lifespan",
+      "type": "pubmed",
+      "query": "(longevity[Title/Abstract] OR lifespan[Title/Abstract] OR healthspan[Title/Abstract]) AND humans[MeSH Terms]",
+      "enabled": true,
+      "maxItems": 15,
+      "tags": ["pubmed", "longevity"]
+    },
+    {
+      "id": "pubmed-senolytics",
+      "name": "PubMed: senolytics and cellular senescence",
+      "type": "pubmed",
+      "query": "senolytic[Title/Abstract] OR (cellular senescence[Title/Abstract] AND aging[Title/Abstract])",
+      "enabled": true,
+      "maxItems": 15,
+      "tags": ["pubmed", "senescence"]
+    },
+    {
+      "id": "pubmed-metabolic-interventions",
+      "name": "PubMed: fasting, rapamycin and metformin interventions",
+      "type": "pubmed",
+      "query": "(rapamycin[Title/Abstract] OR metformin[Title/Abstract] OR caloric restriction[Title/Abstract] OR time restricted eating[Title/Abstract]) AND aging[Title/Abstract]",
+      "enabled": true,
+      "maxItems": 15,
+      "tags": ["pubmed", "interventions"]
+    },
+    {
+      "id": "nature-aging",
+      "name": "Nature Aging",
+      "type": "rss",
+      "url": "https://www.nature.com/nataging.rss",
+      "enabled": true,
+      "maxItems": 20,
+      "tags": ["journal", "aging"]
+    },
+    {
+      "id": "medrxiv-geriatrics",
+      "name": "medRxiv: geriatric medicine preprints",
+      "type": "rss",
+      "url": "https://connect.medrxiv.org/medrxiv_xml.php?subject=geriatric_medicine",
+      "enabled": true,
+      "maxItems": 20,
+      "tags": ["preprint", "geriatrics"]
+    },
+    {
+      "id": "lifespan-io",
+      "name": "Lifespan.io",
+      "type": "rss",
+      "url": "https://www.lifespan.io/feed/",
+      "enabled": true,
+      "maxItems": 15,
+      "tags": ["blog", "longevity"]
+    },
+    {
+      "id": "fight-aging",
+      "name": "Fight Aging!",
+      "type": "rss",
+      "url": "https://www.fightaging.org/feed/",
+      "enabled": true,
+      "maxItems": 15,
+      "tags": ["blog", "longevity"]
+    },
+    {
+      "id": "peter-attia",
+      "name": "Peter Attia MD",
+      "type": "rss",
+      "url": "https://peterattiamd.com/feed/",
+      "enabled": false,
+      "maxItems": 10,
+      "tags": ["blog", "biohacking"],
+      "note": "Blocks plain HTTP clients with 403. Fetch through the RSSHub MCP (RSSHUB_BASE_URL) or the Playwright MCP instead."
+    }
+  ]
+}

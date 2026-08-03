@@ -13,6 +13,7 @@
 
 ```text
 GET    /api/mcp/servers
+GET    /api/rag/search?q=nmn&prefix=longevity/protocols
 GET    /api/mcp/memory
 POST   /api/mcp/memory
 DELETE /api/mcp/memory/:id
@@ -64,6 +65,14 @@ It is patched by T1 to:
 
 Run the smoke test with `pnpm test:5sim-smoke`.
 
+## Longevity scraping
+
+Feeds and PubMed queries are configured in `integrations/longevity-sources.json` and fetched by `pnpm rag:scrape-longevity` into `rag/longevity/feeds`, where the RAG memory sync indexes them. Sources that block plain HTTP clients (currently `peter-attia`) stay disabled and should be fetched through the RSSHub or Playwright MCP instead.
+
+## Discord research bridge
+
+`integrations/discord/discord_bridge.py` answers `/rag`, `/protocols`, `/labs`, `/feeds`, `/status` and `/sync` from Discord by calling the T1 API, and posts research heads-ups through an incoming webhook. Reindexing is the only write and requires `DISCORD_ALLOW_WRITES=true`. See `integrations/discord/README.md`.
+
 ## Signal CLI MCP
 
 `signal-cli-mcp` proposes sending Signal messages and creating groups, but nothing is sent without explicit human approval through a local web GUI. It requires a running `signal-cli-rest-api` instance; start it with the `docker-compose.yml` in `integrations/vendor/signal-cli-mcp` and link the device via the QR code endpoint. Set `SIGNAL_ACCOUNT` to the registered E.164 number.
@@ -81,8 +90,9 @@ Run the smoke test with `pnpm test:5sim-smoke`.
 - GitHub MCP uses GitHub's remote MCP endpoint.
 - Hugging Face Hub MCP uses the Hub MCP endpoint.
 - Google Maps uses a server-side adapter and `GOOGLE_MAPS_API_KEY`.
-- Playwright MCP runs through `npx @playwright/mcp@latest` in an approved development runtime.
-- RSSHub is accessed through `RSSHUB_BASE_URL`.
+- Playwright MCP runs through `npx @playwright/mcp@latest` in an approved development runtime. Enabled by default for longevity scraping of sources that block plain HTTP clients.
+- RSSHub is accessed through `RSSHUB_BASE_URL`. Enabled by default as the feed source for longevity research.
+- The Discord research bridge runs locally through `integrations/discord/discord_bridge.py` and needs `DISCORD_BOT_TOKEN` or `DISCORD_WEBHOOK_URL`.
 - 5sim / SMS provider MCP runs locally through `integrations/vendor/agents-sms`.
 - Signal CLI MCP runs locally through `integrations/vendor/signal-cli-mcp` and depends on `signal-cli-rest-api`.
 - Telegram MCP v2 runs locally through `integrations/vendor/telegram-mcp-1`.

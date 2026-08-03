@@ -47,6 +47,10 @@ await mkdir(path.join(root, 'rag/inbox'), { recursive: true });
 await mkdir(path.join(root, 'rag/google-drive'), { recursive: true });
 await mkdir(path.join(root, 'rag/wisdom/common/everyday tips'), { recursive: true });
 await mkdir(path.join(root, 'rag/Code/LLM_scripts'), { recursive: true });
+await mkdir(path.join(root, 'rag/imports/chatgpt'), { recursive: true });
+await mkdir(path.join(root, 'rag/longevity/protocols'), { recursive: true });
+await mkdir(path.join(root, 'rag/longevity/labs'), { recursive: true });
+await mkdir(path.join(root, 'rag/longevity/feeds'), { recursive: true });
 
 console.log('Installing dependencies...');
 run('pnpm', ['install', '--frozen-lockfile']);
@@ -72,6 +76,9 @@ console.log('- Local/Termux: download or sync Drive files into rag/google-drive,
 console.log('\nHourly wisdom: add PDF, DOCX, DOC, TXT, TEXT or MD files to rag/wisdom/common/everyday tips.');
 console.log('Uber mode proposals are written to rag/Code/LLM_scripts/<model>/ as review-only Markdown.');
 console.log('\nCredentials and OAuth tokens must remain in the platform connection/secret store and must never be committed to GitHub.');
+console.log('\nLongevity research: drop protocols in rag/longevity/protocols and lab results in rag/longevity/labs.');
 console.log('\nNext commands:');
 console.log('  pnpm rag:sync');
+console.log('  pnpm rag:import-chatgpt --source <chatgpt-export.zip>');
+console.log('  pnpm rag:scrape-longevity');
 console.log('  pnpm dev');
