@@ -1,45 +1,61 @@
-# [Project name]
+# T1 — Operation København (Biohacking / Longevity Webapp)
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An AI-first longevity and biohacking research platform. The AI continuously observes, explains, and coaches based on Google Drive RAG knowledge, PubMed data, and user-driven scenarios. Built as a pnpm monorepo with an Express API and a React/Vite frontend (with a Nuxt frontend in progress).
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- **Start all services**: use the workflow run buttons (API Server + Nordlys Command)
+- **API server** (port from `PORT` env): `pnpm --filter @workspace/api-server run dev`
+- **React frontend** (command-sim): `pnpm --filter @workspace/command-sim run dev`
+- **Install deps**: `pnpm install`
+- **RAG sync**: `pnpm rag:sync`
+- **MCP vendor setup**: `pnpm setup:mcp`
+- **Typecheck**: `pnpm run typecheck`
+- **Build**: `pnpm run build`
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Monorepo**: pnpm workspaces, Node.js 20, TypeScript 5.9
+- **API**: Express 5 (`artifacts/api-server`)
+- **Frontend (current)**: React + Vite + shadcn/ui (`artifacts/command-sim`) — dark blue tactical theme
+- **Frontend (in progress)**: Nuxt 3 — black/white/gray + purple/blue/orange theme
+- **LLM**: OpenRouter (multi-model rotation) — requires `OPENROUTER_API_KEY` secret
+- **RAG**: Google Drive-oriented; files go in `rag/` or set `GOOGLE_DRIVE_RAG_PATH`
+- **Maps**: Google Maps (falls back to OpenStreetMap if `VITE_GOOGLE_MAPS_API_KEY` is empty)
+
+## Required Secrets
+
+- `OPENROUTER_API_KEY` — must be added via Replit Secrets for LLM features to work
+- `SESSION_SECRET` — already configured
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/api-server/src/` — Express routes, LLM, RAG, observability
+- `artifacts/command-sim/src/` — React frontend (pages, components, game lib)
+- `artifacts/api-server/src/lib/openrouter.ts` — LLM routing
+- `artifacts/api-server/src/lib/rag-memory.ts` — RAG ingestion
+- `artifacts/command-sim/src/index.css` — design tokens / CSS variables
+- `docs/` — project specs, Figma notes, world spec
+- `rag/` — RAG inbox and Google Drive sync folder
+- `scripts/` — setup, RAG sync, MCP vendor install
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- LLM routing via OpenRouter with `rotate | static | off` modes — falls back to deterministic output when LLM unavailable
+- RAG deduplication by SHA-256; persistent memory injected into every advisor request
+- Google Drive is the only external RAG source — OAuth tokens stay in Replit connections, never in GitHub
+- Three-column resizable board layout: left palette rail, center map canvas, right advisor/properties rail
+- MCP registry in `integrations/mcp/` — write/modify ops require explicit approval
 
-## Product
+## Frontend direction (active)
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Building**: New Nuxt 3 frontend (`artifacts/nuxt-frontend`)
+- **Theme**: black/white/gray base + purple/blue/orange accent palette
+- **Goal**: replaces the React command-sim UI, works as a pure webapp (Replit/GitHub), structure ready for future Tauri desktop packaging
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Push to GitHub regularly — user is on free plan and works across Devin → Replit → Manus
+- Keep OAuth tokens and API keys in platform secrets, never in GitHub
+- Preserve existing pnpm workspace, Express API, and Google Drive RAG flow
+- Use `observe → diagnose → propose → approve → apply → validate` workflow for all changes
