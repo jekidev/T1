@@ -50,3 +50,15 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+.env
+.env.local
+__pycache__/
+*.pyc
+
+# Personal or scraped RAG content. Only the folder READMEs are tracked.
+imports/chatgpt-export/
+rag/imports/chatgpt/*
+!rag/imports/chatgpt/README.md
+rag/longevity/feeds/*
+!rag/longevity/feeds/README.md

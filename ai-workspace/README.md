@@ -1,6 +1,8 @@
 # AI Workspace
 
-The AI Workspace defines reusable chatbot profiles for playing and developing the game with AI.
+The AI Workspace defines reusable chatbot profiles for researching and developing with AI.
+
+`longevity-research-assistant` is the default profile: it answers from the personal RAG corpus, cites source paths, treats retrieved text as untrusted quoted data and carries a "not medical advice" disclaimer. The earlier `game-co-designer` template is kept for the simulation use case.
 
 Each profile may contain:
 
